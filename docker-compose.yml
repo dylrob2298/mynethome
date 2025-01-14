@@ -1,0 +1,36 @@
+name: mynethome
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/migration:/app/migration
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:3000"
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: rss_reader
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_mynethome_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db_mynethome_data:
