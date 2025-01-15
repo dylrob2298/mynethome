@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import Annotated
+
 from ..schemas.feed import FeedAdd, FeedOut, FeedUpdate, FeedSearchParams
 from ..dependencies import DBSessionDep
 from ..db.crud import crud_feed
 from ..services.feed_service import handle_feed_addition, handle_refresh_feed
+from ..utils.utils import enrich_feeds
 
 
 router = APIRouter(
@@ -16,15 +18,19 @@ async def get_all_feeds(db_session: DBSessionDep):
     feeds = await crud_feed.get_all_feeds(db_session)
     if not feeds:
         return []
-    return [FeedOut.model_validate(feed) for feed in feeds]
+    return await enrich_feeds(db_session, feeds)
 
 @router.post("/", response_model=FeedOut)
 async def add_new_feed(new_feed: FeedAdd, db_session: DBSessionDep):
-    return await handle_feed_addition(new_feed, db_session)
+    feed = await handle_feed_addition(new_feed, db_session)
+    return await enrich_feeds(db_session, [feed])[0]
 
 @router.get("/search", response_model=list[FeedOut])
 async def get_feeds(db_session: DBSessionDep, feed_search_query: Annotated[FeedSearchParams, Query()]):
-    return await crud_feed.get_feeds(db_session, feed_search_query)
+    feeds = await crud_feed.get_feeds(db_session, feed_search_query)
+    if not feeds:
+        return []
+    return await enrich_feeds(db_session, feeds)
 
 @router.patch("/{feed_id}", response_model=FeedOut)
 async def update_feed(feed_id: int, feed_update: FeedUpdate, db_session: DBSessionDep):
@@ -35,7 +41,7 @@ async def update_feed(feed_id: int, feed_update: FeedUpdate, db_session: DBSessi
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     
-    return FeedOut.model_validate(updated_feed)
+    return await enrich_feeds(db_session, [updated_feed])[0]
 
 @router.delete("/{feed_id}")
 async def delete_feed(feed_id: int, db_session: DBSessionDep):

@@ -48,5 +48,8 @@ class ArticleSearchParams(BaseModel):
     author: str | None = None
     is_favorited: bool | None = None
     is_read: bool | None = None
-    order_by: Literal["created_at", "last_updated"] = "created_at"
+    order_by: Literal["created_at", "last_updated", "published_at", "updated_at"] = "created_at"
 
+class ArticleSearchResponse(BaseSchema):
+    articles: list[ArticleOut]
+    total_count: int

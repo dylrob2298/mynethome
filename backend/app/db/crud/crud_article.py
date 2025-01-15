@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.article import Article
 from ..models.feed_articles import FeedArticles
@@ -61,7 +61,7 @@ async def get_articles_by_feed_id(db: AsyncSession, feed_id: int, limit: int = 1
     result = await db.execute(query)
     return result.scalars().all()
 
-async def get_articles(db: AsyncSession, params: ArticleSearchParams) -> list[Article]:
+async def get_articles(db: AsyncSession, params: ArticleSearchParams) -> tuple[list[Article], int]:
     query = select(Article)
 
     if params.feed_id:
@@ -83,11 +83,19 @@ async def get_articles(db: AsyncSession, params: ArticleSearchParams) -> list[Ar
         query = query.order_by(Article.created_at.desc())
     elif params.order_by == "last_updated":
         query = query.order_by(Article.last_updated.desc())
+    elif params.order_by == "published_at":
+        query = query.order_by(Article.published_at.desc())
+    elif params.order_by == "updated_at":
+        query = query.order_by(Article.updated_at.desc())
 
-    query = query.limit(params.limit).offset(params.offset)
+    total_query = select(func.count()).select_from(query.subquery())
 
-    result = await db.execute(query)
-    return result.scalars().all()
+    paginated_query = query.limit(params.limit).offset(params.offset)
+
+    result = await db.execute(paginated_query)
+    total_count = await db.scalar(total_query)
+
+    return result.scalars().all(), total_count
 
 
 async def get_article_by_link(db: AsyncSession, link: str) -> Article | None:
@@ -105,3 +113,20 @@ async def delete_article_by_id(db: AsyncSession, article_id: int) -> None:
     if article:
         await db.delete(article)
         await db.commit()
+
+async def get_article_counts_for_feeds(db: AsyncSession, feed_ids: list[int]) -> dict[int, int]:
+    """
+    Calculate the number of articles for each feed in the provided list of feed IDs.
+
+    :param db: Database session
+    :param feed_ids: List of feed IDs
+    :return: Dictionary mapping feed ID to article count
+    """
+    query = (
+        select(FeedArticles.feed_id, func.count(FeedArticles.article_id).label("article_count"))
+        .where(FeedArticles.feed_id.in_(feed_ids))
+        .group_by(FeedArticles.feed_id)
+    )
+
+    result = await db.execute(query)
+    return {row.feed_id: row.article_count for row in result.all()}

@@ -26,6 +26,7 @@ class FeedOut(FeedBase):
     id: int
     created_at: datetime
     last_updated: datetime
+    total_articles: int = 0
 
     model_config = {
         "from_attributes": True

@@ -1,226 +1,195 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { format, parseISO } from 'date-fns'
 import Image from 'next/image'
-import { format } from 'date-fns'
 import { Article } from '@/types/article'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ArticleWidget } from './article-widget'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Heart, RefreshCw, LayoutGrid, List } from 'lucide-react'
+import { Heart, RefreshCw, LayoutGrid, List, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { getArticles, updateArticle, refreshFeed } from '@/lib/api'
 
 interface ArticleListProps {
-  articles: Article[]
+  feedId: number
   feedName: string
   feedDescription?: string
 }
 
 const ARTICLES_PER_PAGE = 10
 
-export function ArticleList({ articles, feedName, feedDescription }: ArticleListProps) {
-  const [selectedArticle, setSelectedArticleState] = useState<Article | null>(null)
-  const [favorites, setFavorites] = useState<Set<string>>(new Set())
-  const [readArticles, setReadArticles] = useState<Set<string>>(new Set())
+export function ArticleList({ feedId, feedName, feedDescription }: ArticleListProps) {
+  const [articles, setArticles] = useState<Article[]>([])
+  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   const [isGridView, setIsGridView] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [totalArticles, setTotalArticles] = useState(0)
 
-  const totalPages = Math.ceil(articles.length / ARTICLES_PER_PAGE)
-  const paginatedArticles = articles.slice(
-    (currentPage - 1) * ARTICLES_PER_PAGE,
-    currentPage * ARTICLES_PER_PAGE
-  )
-
-  const setSelectedArticle = (article: Article | null) => {
-    if (article && !readArticles.has(article.id)) {
-      setReadArticles(new Set(readArticles).add(article.id))
+  const fetchArticles = useCallback(async () => {
+    if (!feedId) return;
+    try {
+      setIsLoading(true)
+      const { articles: fetchedArticles, total_count } = await getArticles({
+        feed_id: feedId,
+        limit: ARTICLES_PER_PAGE,
+        offset: (currentPage - 1) * ARTICLES_PER_PAGE,
+      })
+      setArticles(fetchedArticles)
+      setTotalArticles(total_count)
+      setError(null)
+    } catch (err) {
+      setError('Failed to fetch articles')
+    } finally {
+      setIsLoading(false)
     }
-    setSelectedArticleState(article)
+  }, [feedId, currentPage])
+
+  useEffect(() => {
+    fetchArticles()
+  }, [fetchArticles])
+
+  const handleRefresh = async () => {
+    try {
+      await refreshFeed(feedId)
+      await fetchArticles()
+    } catch (err) {
+      setError('Failed to refresh feed')
+    }
   }
 
-  const closeArticle = () => setSelectedArticle(null)
+  const handleToggleFavorite = async (article: Article) => {
+    try {
+      const updatedArticle = await updateArticle(article.id, { is_favorited: !article.is_favorited })
+      setArticles(articles.map(a => a.id === updatedArticle.id ? updatedArticle : a))
+    } catch (err) {
+      setError('Failed to update article')
+    }
+  }
 
-  const toggleFavorite = (articleId: string) => {
-    setFavorites((prevFavorites) => {
-      const newFavorites = new Set(prevFavorites)
-      if (newFavorites.has(articleId)) {
-        newFavorites.delete(articleId)
-      } else {
-        newFavorites.add(articleId)
+  const handleArticleClick = async (article: Article) => {
+    try {
+      if (!article.is_read) {
+        const updatedArticle = await updateArticle(article.id, { is_read: true })
+        setArticles(articles.map(a => a.id === updatedArticle.id ? updatedArticle : a))
       }
-      return newFavorites
-    })
+      setSelectedArticle(article)
+    } catch (err) {
+      setError('Failed to update article')
+    }
   }
+
+  const formatDate = (dateString: string) => {
+    try {
+      const date = parseISO(dateString)
+      return format(date, 'MMM d, yyyy')
+    } catch (error) {
+      console.error('Invalid date:', dateString)
+      return 'Invalid date'
+    }
+  }
+
+  const renderArticleCard = (article: Article) => (
+    <Card
+      key={article.id}
+      className={`cursor-pointer transition-shadow hover:shadow-md ${
+        article.is_read ? 'opacity-60' : ''
+      }`}
+      onClick={() => handleArticleClick(article)}
+    >
+      <CardContent className="p-4 flex">
+        <div className="flex-shrink-0 mr-4">
+          <div className="relative w-20 h-20 rounded-md overflow-hidden">
+            {article.image_url ? (
+              <Image
+                src={article.image_url || "/placeholder.svg"}
+                alt={article.title}
+                fill
+                className="object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = '/placeholder.svg';
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700">
+                <ImageOff className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex-grow">
+          <h3 className="text-lg font-semibold mb-1 line-clamp-2">{article.title}</h3>
+          <p className="text-sm text-gray-500 mb-1">{formatDate(article.published_at)}</p>
+          <p className="text-sm line-clamp-2">{article.summary}</p>
+          <div className="flex justify-between items-center mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleToggleFavorite(article)
+              }}
+            >
+              <Heart className={`h-4 w-4 ${article.is_favorited ? 'fill-current text-red-500' : ''}`} />
+            </Button>
+            <span className="text-xs text-gray-500">{article.author}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   const renderListView = () => (
     <div className="space-y-4">
-      {paginatedArticles.map((article) => (
-        <div
-          key={article.id}
-          className={`p-4 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer ${
-            readArticles.has(article.id) ? 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700' : ''
-          }`}
-          onClick={() => setSelectedArticle(article.id === selectedArticle?.id ? null : article)}
-        >
-          <div className="flex items-start gap-4">
-            {article.imageUrl && (
-              <Image
-                src={article.imageUrl}
-                alt={article.title}
-                width={80}
-                height={80}
-                className="rounded-md object-cover"
-              />
-            )}
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <h3 className={`font-semibold mb-1 hover:underline ${readArticles.has(article.id) ? 'text-gray-600 dark:text-gray-400' : ''}`}>
-                  {article.title}
-                </h3>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(article.id);
-                  }}
-                  className={`p-1 rounded-full transition-colors ${
-                    favorites.has(article.id) ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-gray-500'
-                  }`}
-                  aria-label={favorites.has(article.id) ? "Remove from favorites" : "Add to favorites"}
-                >
-                  <Heart className="w-5 h-5" fill={favorites.has(article.id) ? "currentColor" : "none"} />
-                </button>
-              </div>
-              {article.author && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">By {article.author}</p>
-              )}
-              <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
-                {format(new Date(article.publishedAt), 'PPP')}
-              </p>
-              {article.feedName && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 mb-2">
-                  From: {article.feedName}
-                </p>
-              )}
-              {selectedArticle?.id !== article.id && (
-                <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{article.content.replace(/<[^>]*>/g, '')}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
+      {articles.map(renderArticleCard)}
     </div>
   )
 
   const renderGridView = () => (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {paginatedArticles.map((article) => (
-        <Card 
-          key={article.id} 
-          className={`overflow-hidden transition-all duration-300 hover:shadow-lg ${
-            readArticles.has(article.id) ? 'bg-gray-100 dark:bg-gray-800' : 'bg-white dark:bg-gray-700'
-          }`}
-        >
-          <div 
-            className="cursor-pointer"
-            onClick={() => setSelectedArticle(article.id === selectedArticle?.id ? null : article)}
-          >
-            {article.imageUrl && (
-              <div className="relative w-full h-48">
-                <Image
-                  src={article.imageUrl}
-                  alt={article.title}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-            )}
-            <CardContent className="p-4">
-              <h3 className={`font-semibold text-lg mb-2 line-clamp-2 ${readArticles.has(article.id) ? 'text-gray-600 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                {article.title}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                {article.author && `By ${article.author} • `}
-                {format(new Date(article.publishedAt), 'MMM d, yyyy')}
-              </p>
-              <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
-                {article.content.replace(/<[^>]*>/g, '')}
-              </p>
-            </CardContent>
-          </div>
-          <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex justify-between items-center">
-            {article.feedName && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {article.feedName}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(article.id);
-              }}
-              className={favorites.has(article.id) ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-gray-500'}
-            >
-              <Heart className="h-4 w-4" fill={favorites.has(article.id) ? "currentColor" : "none"} />
-              <span className="sr-only">{favorites.has(article.id) ? "Remove from favorites" : "Add to favorites"}</span>
-            </Button>
-          </div>
-        </Card>
-      ))}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {articles.map(renderArticleCard)}
     </div>
   )
 
-  const renderPagination = () => (
-    <Pagination>
-      <PaginationContent>
-        <PaginationItem>
-          <PaginationPrevious 
-            href="#" 
-            onClick={(e) => {
-              e.preventDefault();
-              if (currentPage > 1) setCurrentPage(currentPage - 1);
-            }}
-          />
-        </PaginationItem>
-        {[...Array(totalPages)].map((_, i) => (
-          <PaginationItem key={i}>
-            <PaginationLink 
-              href="#" 
-              isActive={currentPage === i + 1}
-              onClick={(e) => {
-                e.preventDefault();
-                setCurrentPage(i + 1);
-              }}
-            >
-              {i + 1}
-            </PaginationLink>
+  const renderPagination = () => {
+    const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE)
+    return (
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious 
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              isActive={currentPage === 1}
+            />
           </PaginationItem>
-        ))}
-        <PaginationItem>
-          <PaginationNext 
-            href="#" 
-            onClick={(e) => {
-              e.preventDefault();
-              if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-            }}
-          />
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
-  )
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <PaginationItem key={page}>
+              <PaginationLink
+                onClick={() => setCurrentPage(page)}
+                isActive={currentPage === page}
+              >
+                {page}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
+          <PaginationItem>
+            <PaginationNext 
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              isActive={currentPage === totalPages}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    )
+  }
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -236,7 +205,7 @@ export function ArticleList({ articles, feedName, feedDescription }: ArticleList
               >
                 {isGridView ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
               </Toggle>
-              <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4" />
                 Update Feed
               </Button>
@@ -247,7 +216,13 @@ export function ArticleList({ articles, feedName, feedDescription }: ArticleList
           )}
         </div>
         <ScrollArea className="h-[calc(100vh-200px)]">
-          {isGridView ? renderGridView() : renderListView()}
+          {isLoading ? (
+            <p>Loading articles...</p>
+          ) : error ? (
+            <p className="text-red-500">{error}</p>
+          ) : (
+            isGridView ? renderGridView() : renderListView()
+          )}
         </ScrollArea>
         <div className="mt-6">
           {renderPagination()}
@@ -265,21 +240,9 @@ export function ArticleList({ articles, feedName, feedDescription }: ArticleList
           >
             <ArticleWidget 
               article={selectedArticle} 
-              onClose={closeArticle} 
-              isFavorite={favorites.has(selectedArticle?.id)}
-              toggleFavorite={() => toggleFavorite(selectedArticle.id)}
-              onPrevious={() => {
-                const currentIndex = articles.findIndex(a => a.id === selectedArticle.id);
-                const prevIndex = (currentIndex - 1 + articles.length) % articles.length;
-                setSelectedArticle(articles[prevIndex]);
-              }}
-              onNext={() => {
-                const currentIndex = articles.findIndex(a => a.id === selectedArticle.id);
-                const nextIndex = (currentIndex + 1) % articles.length;
-                setSelectedArticle(articles[nextIndex]);
-              }}
-              hasPrevious={articles.length > 1}
-              hasNext={articles.length > 1}
+              onClose={() => setSelectedArticle(null)} 
+              isFavorite={selectedArticle.is_favorited}
+              toggleFavorite={() => handleToggleFavorite(selectedArticle)}
             />
           </motion.div>
         )}

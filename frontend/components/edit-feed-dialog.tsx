@@ -6,41 +6,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { addFeed } from '@/lib/api'
+import { editFeed } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { Feed } from '@/types/feed'
 
-
-interface AddFeedDialogProps {
+interface EditFeedDialogProps {
   isOpen: boolean
   onClose: () => void
-  onAddFeed: (feed: Feed) => void
+  onEditFeed: (updatedFeed: Feed) => void
+  feed: Feed
 }
 
-export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps) {
-  const [url, setUrl] = useState('')
-  const [category, setCategory] = useState('')
+export function EditFeedDialog({ isOpen, onClose, onEditFeed, feed }: EditFeedDialogProps) {
+  const [name, setName] = useState(feed.name)
+  const [category, setCategory] = useState(feed.category || '')
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (url.trim()) {
+    if (name.trim()) {
       try {
         setIsLoading(true)
-        const newFeed = await addFeed({ url: url.trim(), category: category.trim() })
-        onAddFeed(newFeed)
-        setUrl('')
-        setCategory('')
+        const updatedFeed = await editFeed(feed.id, { name: name.trim(), category: category.trim() })
+        onEditFeed(updatedFeed)
         onClose()
         toast({
-          title: "Feed Added",
-          description: `${newFeed.name} has been added to your feed list${category ? ` in the ${category} category` : ''}.`,
+          title: "Feed Updated",
+          description: `${updatedFeed.name} has been updated.`,
         })
       } catch (error) {
         toast({
           title: "Error",
-          description: "Failed to add feed. Please try again.",
+          description: "Failed to update feed. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -49,7 +47,7 @@ export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps
     } else {
       toast({
         title: "Error",
-        description: "Please enter both a name and URL for the feed.",
+        description: "Please enter a name for the feed.",
         variant: "destructive",
       })
     }
@@ -59,24 +57,22 @@ export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New RSS Feed</DialogTitle>
+          <DialogTitle>Edit Feed</DialogTitle>
           <DialogDescription>
-            Enter the details of the RSS feed you want to add.
+            Update the details of your RSS feed.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="url" className="text-right">
-                URL
+              <Label htmlFor="name" className="text-right">
+                Name
               </Label>
               <Input
-                id="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="col-span-3"
-                placeholder="https://example.com/rss"
-                type="url"
               />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
@@ -88,13 +84,12 @@ export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 className="col-span-3"
-                placeholder="Technology"
               />
             </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Adding...' : 'Add Feed'}
+              {isLoading ? 'Updating...' : 'Update Feed'}
             </Button>
           </DialogFooter>
         </form>

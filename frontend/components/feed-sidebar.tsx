@@ -1,78 +1,74 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
-import { useState } from 'react'
-import Image from 'next/image'
-import { Sidebar, SidebarContent, SidebarHeader, SidebarTrigger } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Input } from '@/components/ui/input'
-import { Search, Inbox, Plus, ChevronRight, ChevronDown, Folder } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { Feed } from '@/types/feed'
+import { getFeeds } from '@/lib/api'
+import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Plus, Search, Edit } from 'lucide-react'
+import { AddFeedDialog } from './add-feed-dialog'
+import { EditFeedsWidget } from './edit-feeds-widget'
 
 interface FeedSidebarProps {
-  feeds: Feed[]
-  selectedFeed: string | null
-  selectedFolder: string | null
-  onSelectFeed: (feedId: string | null) => void
-  onSelectFolder: (folder: string | null) => void
-  onAddFeed: () => void
+  onFeedSelect: (feed: Feed) => void
 }
 
-export function FeedSidebar({ 
-  feeds, 
-  selectedFeed, 
-  selectedFolder,
-  onSelectFeed, 
-  onSelectFolder,
-  onAddFeed 
-}: FeedSidebarProps) {
+export function FeedSidebar({ onFeedSelect }: FeedSidebarProps) {
+  const [feeds, setFeeds] = useState<Feed[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
 
-  const filteredFeeds = feeds.filter(feed => 
+  useEffect(() => {
+    fetchFeeds()
+  }, [])
+
+  const fetchFeeds = async () => {
+    try {
+      setIsLoading(true)
+      const fetchedFeeds = await getFeeds()
+      setFeeds(fetchedFeeds)
+      setError(null)
+    } catch (err) {
+      setError('Failed to fetch feeds')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAddFeed = (newFeed: Feed) => {
+    setFeeds([...feeds, newFeed])
+  }
+
+  const handleFeedsUpdate = (updatedFeeds: Feed[]) => {
+    setFeeds(updatedFeeds)
+    // If you need to perform any additional actions after updating feeds, do it here
+  }
+
+  const filteredFeeds = feeds.filter(feed =>
     feed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (feed.category && feed.category.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  const groupedFeeds = filteredFeeds.reduce((acc, feed) => {
-    if (feed.category) {
-      if (!acc[feed.category]) {
-        acc[feed.category] = []
-      }
-      acc[feed.category].push(feed)
-    } else {
-      if (!acc['uncategorized']) {
-        acc['uncategorized'] = []
-      }
-      acc['uncategorized'].push(feed)
-    }
-    return acc
-  }, {} as Record<string, Feed[]>)
-
-  const toggleFolder = (folder: string) => {
-    setExpandedFolders(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(folder)) {
-        newSet.delete(folder)
-      } else {
-        newSet.add(folder)
-      }
-      return newSet
-    })
-  }
-
   return (
-    <Sidebar className="bg-gray-100 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-      <SidebarHeader className="px-4 py-2">
+    <Sidebar>
+      <SidebarHeader>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center space-x-2">
-            <SidebarTrigger />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">RSS Feeds</h2>
+          <h2 className="text-lg font-semibold">RSS Feeds</h2>
+          <div className="flex space-x-2">
+            <Button variant="outline" size="icon" onClick={() => setIsEditWidgetOpen(true)} title="Edit feeds">
+              <Edit className="h-4 w-4" />
+              <span className="sr-only">Edit feeds</span>
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setIsAddDialogOpen(true)} title="Add new feed">
+              <Plus className="h-4 w-4" />
+              <span className="sr-only">Add new feed</span>
+            </Button>
           </div>
-          <Button variant="outline" size="icon" onClick={onAddFeed} title="Add new feed">
-            <Plus className="h-4 w-4" />
-            <span className="sr-only">Add new feed</span>
-          </Button>
         </div>
         <div className="relative">
           <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-500 dark:text-gray-400" />
@@ -86,93 +82,37 @@ export function FeedSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <Button
-            variant={selectedFolder === null && selectedFeed === null ? 'secondary' : 'ghost'}
-            className="w-full justify-start mb-2 text-gray-700 dark:text-gray-300"
-            onClick={() => {
-              onSelectFolder(null)
-              onSelectFeed(null)
-            }}
-          >
-            <Inbox className="mr-2 h-4 w-4" />
-            All Feeds
-          </Button>
-          {groupedFeeds['uncategorized'] && groupedFeeds['uncategorized'].map((feed) => (
-            <Button
-              key={feed.id}
-              variant={selectedFeed === feed.id ? 'secondary' : 'ghost'}
-              className="w-full justify-start mb-1 text-gray-700 dark:text-gray-300"
-              onClick={() => {
-                onSelectFeed(feed.id)
-                onSelectFolder(null)
-              }}
-            >
-              {feed.iconUrl ? (
-                <Image
-                  src={feed.iconUrl}
-                  alt={`${feed.name} icon`}
-                  width={16}
-                  height={16}
-                  className="mr-2 rounded-sm"
-                />
-              ) : (
-                <div className="w-4 h-4 mr-2 bg-gray-300 dark:bg-gray-600 rounded-sm" />
-              )}
-              {feed.name}
-            </Button>
-          ))}
-          {Object.entries(groupedFeeds).filter(([folder]) => folder !== 'uncategorized').map(([folder, folderFeeds]) => (
-            <div key={folder}>
-              <Button
-                variant={selectedFolder === folder ? 'secondary' : 'ghost'}
-                className="w-full justify-start mb-1 text-gray-700 dark:text-gray-300"
-                onClick={() => {
-                  toggleFolder(folder)
-                  onSelectFolder(folder)
-                  onSelectFeed(null)
-                }}
-              >
-                {expandedFolders.has(folder) ? (
-                  <ChevronDown className="mr-2 h-4 w-4" />
-                ) : (
-                  <ChevronRight className="mr-2 h-4 w-4" />
-                )}
-                <Folder className="mr-2 h-4 w-4" />
-                {folder}
-              </Button>
-              {expandedFolders.has(folder) && (
-                <div className="ml-6">
-                  {folderFeeds.map((feed) => (
-                    <Button
-                      key={feed.id}
-                      variant={selectedFeed === feed.id ? 'secondary' : 'ghost'}
-                      className="w-full justify-start mb-1 text-gray-700 dark:text-gray-300"
-                      onClick={() => {
-                        onSelectFeed(feed.id)
-                        onSelectFolder(null)
-                      }}
-                    >
-                      {feed.iconUrl ? (
-                        <Image
-                          src={feed.iconUrl}
-                          alt={`${feed.name} icon`}
-                          width={16}
-                          height={16}
-                          className="mr-2 rounded-sm"
-                        />
-                      ) : (
-                        <div className="w-4 h-4 mr-2 bg-gray-300 dark:bg-gray-600 rounded-sm" />
-                      )}
-                      {feed.name}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </ScrollArea>
+        {isLoading ? (
+          <p>Loading feeds...</p>
+        ) : error ? (
+          <p className="text-red-500">{error}</p>
+        ) : (
+          <SidebarGroup>
+            <SidebarGroupLabel>Your Feeds</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredFeeds.map((feed) => (
+                  <SidebarMenuItem key={feed.id}>
+                    <SidebarMenuButton asChild onClick={() => onFeedSelect(feed)}>
+                      <button className="flex-grow text-left">{feed.name}</button>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
+      <AddFeedDialog
+        isOpen={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAddFeed={handleAddFeed}
+      />
+      <EditFeedsWidget
+        isOpen={isEditWidgetOpen}
+        onClose={() => setIsEditWidgetOpen(false)}
+        onFeedsUpdate={handleFeedsUpdate}
+      />
     </Sidebar>
   )
 }
