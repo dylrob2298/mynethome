@@ -37,6 +37,6 @@ class FeedSearchParams(BaseModel):
     category: str | None = None
     description: str | None = None
     author: str | None = None
-    order_by: Literal["created_at", "last_updated"] = "created_at"
+    order_by: Literal["created_at", "last_updated", "name"] = "name"
     limit: int = Field(100, gt=0, le=100)
     offset: int = Field(0, ge=0)

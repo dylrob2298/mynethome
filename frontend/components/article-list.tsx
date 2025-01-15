@@ -65,30 +65,12 @@ export function ArticleList({ feedIds, feedName, feedDescription }: ArticleListP
 
   const handleRefresh = async () => {
     try {
-      if (feedIds.length === 1) {
-        const result = await refreshFeed(feedIds[0])
-        await fetchArticles(currentPage)
-        
-        if (result.new_articles > 0 || result.updated_articles > 0) {
-          toast({
-            title: "Feed Refreshed",
-            description: `${result.new_articles} new articles fetched, ${result.updated_articles} articles updated.`,
-          })
-        } else {
-          toast({
-            title: "Feed Refreshed",
-            description: "No new or updated articles found.",
-          })
-        }
-      } else {
-        // Refresh all selected feeds
-        await Promise.all(feedIds.map(id => refreshFeed(id)))
-        await fetchArticles(currentPage)
-        toast({
-          title: "Feeds Refreshed",
-          description: "Selected feeds have been updated.",
-        })
-      }
+      await Promise.all(feedIds.map(id => refreshFeed(id)))
+      await fetchArticles(currentPage)
+      toast({
+        title: "Feeds Refreshed",
+        description: "Selected feeds have been updated.",
+      })
     } catch (err) {
       toast({
         title: "Error",

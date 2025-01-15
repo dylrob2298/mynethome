@@ -1,6 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from ..models.feed import Feed
+from ..models.article import Article
+from ..models.feed_articles import FeedArticles
 from ...schemas.feed import FeedCreate, FeedUpdate, FeedSearchParams
 
 async def create_feed(db: AsyncSession, feed_in: FeedCreate) -> Feed:
@@ -38,11 +40,28 @@ async def update_feed(db: AsyncSession, feed_id: int, feed_update: FeedUpdate) -
     await db.refresh(db_feed)
     return db_feed
 
+
 async def delete_feed(db: AsyncSession, feed_id: int) -> None:
-    feed = await get_feed_by_id(db, feed_id)
-    if feed:
-        await db.delete(feed)
-        await db.commit()
+    """
+    Deletes a feed and any orphaned articles (articles with no associated feeds).
+    """
+    # Delete the feed
+    await db.execute(delete(Feed).where(Feed.id == feed_id))
+
+    # Find orphaned articles (articles with no associated feeds)
+    orphaned_articles = await db.execute(
+        select(Article.id)
+        .join(FeedArticles, FeedArticles.article_id == Article.id, isouter=True)
+        .where(FeedArticles.feed_id.is_(None))
+    )
+    article_ids_to_delete = [row[0] for row in orphaned_articles]
+
+    # Delete orphaned articles
+    if article_ids_to_delete:
+        await db.execute(delete(Article).where(Article.id.in_(article_ids_to_delete)))
+
+    # Commit the transaction
+    await db.commit()
 
 async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
     query = select(Feed)
@@ -53,7 +72,9 @@ async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
     if params.category:
         query = query.where(Feed.category.ilike(f"%{params.category}%"))
 
-    if params.order_by == "created_at":
+    if params.order_by == "name":
+        query = query.order_by(Feed.name.asc())
+    elif params.order_by == "created_at":
         query = query.order_by(Feed.created_at.desc())
     elif params.order_by == "last_updated":
         query = query.order_by(Feed.last_updated.desc())

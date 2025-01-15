@@ -3,13 +3,13 @@
 
 import { useState, useEffect } from 'react'
 import { Feed } from '@/types/feed'
-import { getFeeds, editFeed } from '@/lib/api'
+import { getFeeds, editFeed, deleteFeed } from '@/lib/api'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Edit, Check, X } from 'lucide-react'
+import { Edit, Check, X, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 interface EditFeedsWidgetProps {
@@ -57,7 +57,7 @@ export function EditFeedsWidget({ isOpen, onClose, onFeedsUpdate }: EditFeedsWid
         })
         const updatedFeeds = feeds.map(feed => feed.id === updatedFeed.id ? updatedFeed : feed)
         setFeeds(updatedFeeds)
-        onFeedsUpdate(updatedFeeds)  // Add this line
+        onFeedsUpdate(updatedFeeds)
         setEditingFeed(null)
         toast({
           title: "Feed Updated",
@@ -75,6 +75,25 @@ export function EditFeedsWidget({ isOpen, onClose, onFeedsUpdate }: EditFeedsWid
 
   const handleCancelEdit = () => {
     setEditingFeed(null)
+  }
+
+  const handleDeleteFeed = async (feedId: number) => {
+    try {
+      await deleteFeed(feedId)
+      const updatedFeeds = feeds.filter(feed => feed.id !== feedId)
+      setFeeds(updatedFeeds)
+      onFeedsUpdate(updatedFeeds)
+      toast({
+        title: "Feed Deleted",
+        description: "The feed has been successfully deleted.",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete feed. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
@@ -125,6 +144,9 @@ export function EditFeedsWidget({ isOpen, onClose, onFeedsUpdate }: EditFeedsWid
                       </div>
                       <Button size="icon" variant="ghost" onClick={() => handleEditClick(feed)} title="Edit feed">
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleDeleteFeed(feed.id)} title="Delete feed">
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </>
                   )}

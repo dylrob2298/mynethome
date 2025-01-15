@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Feed } from '@/types/feed'
-import { getFeeds } from '@/lib/api'
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarSeparator } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,45 +14,33 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 interface FeedSidebarProps {
   onFeedSelect: (feed: Feed | null) => void
+  onCategorySelect: (category: string | null) => void
   selectedFeed: Feed | null
+  selectedCategory: string | null
+  onFeedsUpdate: (updatedFeeds: Feed[]) => void
+  feeds: Feed[]
 }
 
 interface GroupedFeeds {
   [key: string]: Feed[]
 }
 
-export function FeedSidebar({ onFeedSelect, selectedFeed }: FeedSidebarProps) {
-  const [feeds, setFeeds] = useState<Feed[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, selectedCategory, onFeedsUpdate, feeds }: FeedSidebarProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    fetchFeeds()
-  }, [])
-
-  const fetchFeeds = async () => {
-    try {
-      setIsLoading(true)
-      const fetchedFeeds = await getFeeds()
-      setFeeds(fetchedFeeds)
-      setError(null)
-    } catch (err) {
-      setError('Failed to fetch feeds')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleAddFeed = (newFeed: Feed) => {
-    setFeeds([...feeds, newFeed])
+    onFeedsUpdate([...feeds, newFeed])
   }
 
   const handleFeedsUpdate = (updatedFeeds: Feed[]) => {
-    setFeeds(updatedFeeds)
+    onFeedsUpdate(updatedFeeds)
+    // If the currently selected feed was deleted, reset the selection
+    if (selectedFeed && !updatedFeeds.find(feed => feed.id === selectedFeed.id)) {
+      onFeedSelect(null)
+    }
   }
 
   const getFaviconUrl = (feedUrl: string) => {
@@ -66,7 +53,8 @@ export function FeedSidebar({ onFeedSelect, selectedFeed }: FeedSidebarProps) {
     }
   }
 
-  const toggleCategory = (category: string) => {
+  const toggleCategory = (category: string, event: React.MouseEvent) => {
+    event.stopPropagation()
     setExpandedCategories(prev => {
       const newSet = new Set(prev)
       if (newSet.has(category)) {
@@ -146,63 +134,66 @@ export function FeedSidebar({ onFeedSelect, selectedFeed }: FeedSidebarProps) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {isLoading ? (
-          <p>Loading feeds...</p>
-        ) : error ? (
-          <p className="text-red-500">{error}</p>
-        ) : (
-          <SidebarGroup>
-            <SidebarGroupLabel>Your Feeds</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    onClick={() => onFeedSelect(null)}
-                    className={`w-full justify-start ${!selectedFeed ? 'bg-accent text-accent-foreground' : ''}`}
+        <SidebarGroup>
+          <SidebarGroupLabel>Your Feeds</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  onClick={() => {
+                    onFeedSelect(null)
+                    onCategorySelect(null)
+                  }}
+                  className={`w-full justify-start ${!selectedFeed && !selectedCategory ? 'bg-accent text-accent-foreground' : ''}`}
+                >
+                  <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                    <Inbox className="mr-2 h-4 w-4" />
+                    <span className="font-medium">All Feeds</span>
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarSeparator />
+              {Object.entries(groupedFeeds).map(([category, categoryFeeds]) => (
+                <Collapsible
+                  key={category}
+                  open={expandedCategories.has(category)}
+                >
+                  <SidebarMenuButton 
+                    className={`w-full justify-start px-0 ${selectedCategory === category ? 'bg-accent text-accent-foreground' : ''}`}
+                    onClick={() => onCategorySelect(category)}
                   >
-                    <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                      <Inbox className="mr-2 h-4 w-4" />
-                      <span className="font-medium">All Feeds</span>
+                    <button className="flex items-center justify-between w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                      <div className="flex items-center">
+                        <Folder className="mr-2 h-4 w-4" />
+                        <span className="font-medium">{category}</span>
+                      </div>
+                      <CollapsibleTrigger asChild onClick={(e) => toggleCategory(category, e)}>
+                        <button className="p-1 rounded-sm hover:bg-accent-foreground/10">
+                          {expandedCategories.has(category) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      </CollapsibleTrigger>
                     </button>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarSeparator />
-                {Object.entries(groupedFeeds).map(([category, categoryFeeds]) => (
-                  <Collapsible
-                    key={category}
-                    open={expandedCategories.has(category)}
-                    onOpenChange={() => toggleCategory(category)}
-                  >
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton className="w-full justify-start">
-                        <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                          {expandedCategories.has(category) ? (
-                            <ChevronDown className="mr-2 h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="mr-2 h-4 w-4" />
-                          )}
-                          <Folder className="mr-2 h-4 w-4" />
-                          <span className="font-medium">{category}</span>
-                        </button>
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      {categoryFeeds.map(renderFeedItem)}
-                    </CollapsibleContent>
-                  </Collapsible>
-                ))}
-                {uncategorizedFeeds.length > 0 && (
-                  <>
-                    <SidebarSeparator />
-                    {/* <SidebarGroupLabel>Uncategorized</SidebarGroupLabel> */}
-                    {uncategorizedFeeds.map(renderFeedItem)}
-                  </>
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+                  <CollapsibleContent>
+                    {categoryFeeds.map(renderFeedItem)}
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+              {uncategorizedFeeds.length > 0 && (
+                <>
+                  <SidebarSeparator />
+                  <SidebarGroupLabel>Uncategorized</SidebarGroupLabel>
+                  {uncategorizedFeeds.map(renderFeedItem)}
+                </>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <AddFeedDialog
         isOpen={isAddDialogOpen}

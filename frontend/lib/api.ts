@@ -12,7 +12,7 @@ async function fetchWithErrorHandling(url: string, options?: RequestInit) {
 }
 
 export async function getFeeds(): Promise<Feed[]> {
-  return fetchWithErrorHandling(`${API_BASE_URL}/feeds/`);
+  return fetchWithErrorHandling(`${API_BASE_URL}/feeds/search`);
 }
 
 export async function addFeed(feed: { url: string, category: string }): Promise<Feed> {
@@ -33,8 +33,13 @@ export async function editFeed(feedId: number, updates: Partial<Feed>): Promise<
       },
       body: JSON.stringify(updates),
     });
-  }
+}
 
+export async function deleteFeed(feedId: number): Promise<void> {
+    await fetchWithErrorHandling(`${API_BASE_URL}/feeds/${feedId}`, {
+      method: "DELETE",
+    });
+  }
   
 
   export async function getArticles(params: {
