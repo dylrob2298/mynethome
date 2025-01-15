@@ -12,7 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Heart, RefreshCw, LayoutGrid, List, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination"
 import { getArticles, updateArticle, refreshFeed } from '@/lib/api'
 
 interface ArticleListProps {
@@ -32,14 +32,14 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
   const [error, setError] = useState<string | null>(null)
   const [totalArticles, setTotalArticles] = useState(0)
 
-  const fetchArticles = useCallback(async () => {
+  const fetchArticles = useCallback(async (page: number) => {
     if (!feedId) return;
     try {
       setIsLoading(true)
       const { articles: fetchedArticles, total_count } = await getArticles({
         feed_id: feedId,
         limit: ARTICLES_PER_PAGE,
-        offset: (currentPage - 1) * ARTICLES_PER_PAGE,
+        offset: (page - 1) * ARTICLES_PER_PAGE,
       })
       setArticles(fetchedArticles)
       setTotalArticles(total_count)
@@ -49,16 +49,21 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
     } finally {
       setIsLoading(false)
     }
-  }, [feedId, currentPage])
+  }, [feedId])
 
   useEffect(() => {
-    fetchArticles()
-  }, [fetchArticles])
+    setCurrentPage(1)
+    fetchArticles(1)
+  }, [feedId, fetchArticles])
+
+  useEffect(() => {
+    fetchArticles(currentPage)
+  }, [currentPage, fetchArticles])
 
   const handleRefresh = async () => {
     try {
       await refreshFeed(feedId)
-      await fetchArticles()
+      fetchArticles(currentPage)
     } catch (err) {
       setError('Failed to refresh feed')
     }
@@ -161,29 +166,65 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
 
   const renderPagination = () => {
     const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE)
+    if (totalPages <= 1) return null; // Don't render pagination if there's only one page
+
+    const maxVisiblePages = 5
+    const pageNumbers = []
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1)
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(1)
+      if (startPage > 2) {
+        pageNumbers.push('...')
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i)
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push('...')
+      }
+      pageNumbers.push(totalPages)
+    }
+
     return (
       <Pagination>
-        <PaginationContent>
+        <PaginationContent className="flex justify-between items-center w-full">
           <PaginationItem>
             <PaginationPrevious 
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              isActive={currentPage === 1}
+              isActive={currentPage > 1}
             />
           </PaginationItem>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <PaginationItem key={page}>
-              <PaginationLink
-                onClick={() => setCurrentPage(page)}
-                isActive={currentPage === page}
-              >
-                {page}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
+          <div className="flex-1 flex justify-center items-center space-x-1">
+            {pageNumbers.map((page, index) => (
+              <PaginationItem key={index}>
+                {page === '...' ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page as number)}
+                    isActive={currentPage === page}
+                  >
+                    {page}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+          </div>
           <PaginationItem>
             <PaginationNext 
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              isActive={currentPage === totalPages}
+              isActive={currentPage < totalPages}
             />
           </PaginationItem>
         </PaginationContent>
