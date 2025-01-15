@@ -10,10 +10,6 @@ router = APIRouter(
     tags=["articles"]
 )
 
-@router.get("/", response_model=list[ArticleOut])
-async def get_articles(db_session: DBSessionDep, feed_id: int, limit: int | None = 10, offset: int | None = 0):
-    return  await crud_article.get_articles_by_feed_id(db_session, feed_id, limit, offset)
-
 @router.get("/search", response_model=list[ArticleOut])
 async def get_articles(db_session: DBSessionDep, article_search_query: Annotated[ArticleSearchParams, Query()]):
     return await crud_article.get_articles(db_session, article_search_query)
