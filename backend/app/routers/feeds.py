@@ -18,19 +18,19 @@ async def get_all_feeds(db_session: DBSessionDep):
     feeds = await crud_feed.get_all_feeds(db_session)
     if not feeds:
         return []
-    return await enrich_feeds(db_session, feeds)
+    return feeds
 
 @router.post("/", response_model=FeedOut)
 async def add_new_feed(new_feed: FeedAdd, db_session: DBSessionDep):
     feed = await handle_feed_addition(new_feed, db_session)
-    return await enrich_feeds(db_session, [feed])[0]
+    return feed
 
 @router.get("/search", response_model=list[FeedOut])
 async def get_feeds(db_session: DBSessionDep, feed_search_query: Annotated[FeedSearchParams, Query()]):
     feeds = await crud_feed.get_feeds(db_session, feed_search_query)
     if not feeds:
         return []
-    return await enrich_feeds(db_session, feeds)
+    return feeds
 
 @router.patch("/{feed_id}", response_model=FeedOut)
 async def update_feed(feed_id: int, feed_update: FeedUpdate, db_session: DBSessionDep):
@@ -41,7 +41,7 @@ async def update_feed(feed_id: int, feed_update: FeedUpdate, db_session: DBSessi
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     
-    return await enrich_feeds(db_session, [updated_feed])[0]
+    return updated_feed
 
 @router.delete("/{feed_id}")
 async def delete_feed(feed_id: int, db_session: DBSessionDep):

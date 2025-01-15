@@ -35,20 +35,35 @@ export async function editFeed(feedId: number, updates: Partial<Feed>): Promise<
     });
   }
 
-export async function getArticles(params: {
-  limit?: number;
-  offset?: number;
-  feed_id?: number;
-  is_read?: boolean;
-  is_favorite?: boolean;
-  order_by?: "created_at" | "last_updated";
-}): Promise<ArticleSearchResponse> {
-  const searchParams = new URLSearchParams(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    Object.entries(params).filter(([_, value]) => value !== undefined) as [string, string][]
-  );
-  return fetchWithErrorHandling(`${API_BASE_URL}/articles/search?${searchParams}`);
-}
+  
+
+  export async function getArticles(params: {
+    limit?: number;
+    offset?: number;
+    feed_ids?: number[]; // Multiple feed IDs
+    title?: string;
+    author?: string;
+    is_read?: boolean;
+    is_favorite?: boolean;
+    order_by?: "created_at" | "last_updated" | "published_at" | "updated_at";
+  }): Promise<ArticleSearchResponse> {
+    const searchParams = new URLSearchParams();
+  
+    // Append parameters to the query string
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        if (Array.isArray(value)) {
+          // Append each value separately for repeated parameters
+          value.forEach((item) => searchParams.append(key, item.toString()));
+        } else {
+          searchParams.append(key, value.toString());
+        }
+      }
+    });
+  
+    return fetchWithErrorHandling(`${API_BASE_URL}/articles/search?${searchParams.toString()}`);
+  }
+  
 
 export async function updateArticle(articleId: number, updates: Partial<Article>): Promise<Article> {
   return fetchWithErrorHandling(`${API_BASE_URL}/articles/${articleId}`, {
@@ -60,9 +75,15 @@ export async function updateArticle(articleId: number, updates: Partial<Article>
   });
 }
 
-export async function refreshFeed(feedId: number): Promise<void> {
-  await fetchWithErrorHandling(`${API_BASE_URL}/feeds/${feedId}/refresh`, {
-    method: "POST",
-  });
-}
-
+interface RefreshFeedResponse {
+    new_articles: number;
+    updated_articles: number;
+  }
+  
+  export async function refreshFeed(feedId: number): Promise<RefreshFeedResponse> {
+    const response = await fetchWithErrorHandling(`${API_BASE_URL}/feeds/${feedId}/refresh`, {
+      method: "POST",
+    });
+    return response;
+  }
+  

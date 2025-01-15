@@ -43,7 +43,7 @@ class ArticleOut(ArticleBase):
 class ArticleSearchParams(BaseModel):
     limit: int = Field(100, gt=0, le=100)
     offset: int = Field(0, ge=0)
-    feed_id: int | None = None
+    feed_ids: list[int] = []
     title: str | None = None
     author: str | None = None
     is_favorited: bool | None = None

@@ -14,32 +14,35 @@ import { Button } from '@/components/ui/button'
 import { Toggle } from '@/components/ui/toggle'
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination"
 import { getArticles, updateArticle, refreshFeed } from '@/lib/api'
+import { useToast } from "@/hooks/use-toast"
 
 interface ArticleListProps {
-  feedId: number
+  feedIds: number[]
   feedName: string
   feedDescription?: string
 }
 
 const ARTICLES_PER_PAGE = 10
 
-export function ArticleList({ feedId, feedName, feedDescription }: ArticleListProps) {
+export function ArticleList({ feedIds, feedName, feedDescription }: ArticleListProps) {
   const [articles, setArticles] = useState<Article[]>([])
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
+  const [selectedArticleIndex, setSelectedArticleIndex] = useState<number | null>(null)
   const [isGridView, setIsGridView] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [totalArticles, setTotalArticles] = useState(0)
+  const { toast } = useToast()
 
   const fetchArticles = useCallback(async (page: number) => {
-    if (!feedId) return;
     try {
       setIsLoading(true)
       const { articles: fetchedArticles, total_count } = await getArticles({
-        feed_id: feedId,
+        feed_ids: feedIds,
         limit: ARTICLES_PER_PAGE,
         offset: (page - 1) * ARTICLES_PER_PAGE,
+        order_by: "published_at"
       })
       setArticles(fetchedArticles)
       setTotalArticles(total_count)
@@ -49,12 +52,12 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
     } finally {
       setIsLoading(false)
     }
-  }, [feedId])
+  }, [feedIds])
 
   useEffect(() => {
     setCurrentPage(1)
     fetchArticles(1)
-  }, [feedId, fetchArticles])
+  }, [feedIds, fetchArticles])
 
   useEffect(() => {
     fetchArticles(currentPage)
@@ -62,10 +65,36 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
 
   const handleRefresh = async () => {
     try {
-      await refreshFeed(feedId)
-      fetchArticles(currentPage)
+      if (feedIds.length === 1) {
+        const result = await refreshFeed(feedIds[0])
+        await fetchArticles(currentPage)
+        
+        if (result.new_articles > 0 || result.updated_articles > 0) {
+          toast({
+            title: "Feed Refreshed",
+            description: `${result.new_articles} new articles fetched, ${result.updated_articles} articles updated.`,
+          })
+        } else {
+          toast({
+            title: "Feed Refreshed",
+            description: "No new or updated articles found.",
+          })
+        }
+      } else {
+        // Refresh all selected feeds
+        await Promise.all(feedIds.map(id => refreshFeed(id)))
+        await fetchArticles(currentPage)
+        toast({
+          title: "Feeds Refreshed",
+          description: "Selected feeds have been updated.",
+        })
+      }
     } catch (err) {
-      setError('Failed to refresh feed')
+      toast({
+        title: "Error",
+        description: "Failed to refresh feed(s). Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -73,40 +102,59 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
     try {
       const updatedArticle = await updateArticle(article.id, { is_favorited: !article.is_favorited })
       setArticles(articles.map(a => a.id === updatedArticle.id ? updatedArticle : a))
+      if (selectedArticle && selectedArticle.id === updatedArticle.id) {
+        setSelectedArticle(updatedArticle)
+      }
     } catch (err) {
       setError('Failed to update article')
     }
   }
 
-  const handleArticleClick = async (article: Article) => {
+  const handleArticleClick = async (article: Article, index: number) => {
     try {
       if (!article.is_read) {
         const updatedArticle = await updateArticle(article.id, { is_read: true })
         setArticles(articles.map(a => a.id === updatedArticle.id ? updatedArticle : a))
+        article = updatedArticle
       }
       setSelectedArticle(article)
+      setSelectedArticleIndex(index)
     } catch (err) {
       setError('Failed to update article')
+    }
+  }
+
+  const handlePreviousArticle = () => {
+    if (selectedArticleIndex !== null && selectedArticleIndex > 0) {
+      const previousArticle = articles[selectedArticleIndex - 1]
+      handleArticleClick(previousArticle, selectedArticleIndex - 1)
+    }
+  }
+
+  const handleNextArticle = () => {
+    if (selectedArticleIndex !== null && selectedArticleIndex < articles.length - 1) {
+      const nextArticle = articles[selectedArticleIndex + 1]
+      handleArticleClick(nextArticle, selectedArticleIndex + 1)
     }
   }
 
   const formatDate = (dateString: string) => {
     try {
       const date = parseISO(dateString)
-      return format(date, 'MMM d, yyyy')
+      return format(date, 'HH:mm MMM d, yyyy')
     } catch (error) {
       console.error('Invalid date:', dateString)
       return 'Invalid date'
     }
   }
 
-  const renderArticleCard = (article: Article) => (
+  const renderArticleCard = (article: Article, index: number) => (
     <Card
       key={article.id}
       className={`cursor-pointer transition-shadow hover:shadow-md ${
         article.is_read ? 'opacity-60' : ''
       }`}
-      onClick={() => handleArticleClick(article)}
+      onClick={() => handleArticleClick(article, index)}
     >
       <CardContent className="p-4 flex">
         <div className="flex-shrink-0 mr-4">
@@ -154,19 +202,19 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
 
   const renderListView = () => (
     <div className="space-y-4">
-      {articles.map(renderArticleCard)}
+      {articles.map((article, index) => renderArticleCard(article, index))}
     </div>
   )
 
   const renderGridView = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {articles.map(renderArticleCard)}
+      {articles.map((article, index) => renderArticleCard(article, index))}
     </div>
   )
 
   const renderPagination = () => {
     const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE)
-    if (totalPages <= 1) return null; // Don't render pagination if there's only one page
+    if (totalPages <= 1) return null;
 
     const maxVisiblePages = 5
     const pageNumbers = []
@@ -248,7 +296,7 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
               </Toggle>
               <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4" />
-                Update Feed
+                Update Feed{feedIds.length > 1 ? 's' : ''}
               </Button>
             </div>
           </div>
@@ -284,6 +332,10 @@ export function ArticleList({ feedId, feedName, feedDescription }: ArticleListPr
               onClose={() => setSelectedArticle(null)} 
               isFavorite={selectedArticle.is_favorited}
               toggleFavorite={() => handleToggleFavorite(selectedArticle)}
+              onPrevious={handlePreviousArticle}
+              onNext={handleNextArticle}
+              hasPrevious={selectedArticleIndex !== null && selectedArticleIndex > 0}
+              hasNext={selectedArticleIndex !== null && selectedArticleIndex < articles.length - 1}
             />
           </motion.div>
         )}

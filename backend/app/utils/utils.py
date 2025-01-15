@@ -25,7 +25,6 @@ async def enrich_feeds(
             id=feed.id,
             name=feed.name,
             url=feed.url,
-            link=feed.link,
             category=feed.category,
             author=feed.author,
             description=feed.description,

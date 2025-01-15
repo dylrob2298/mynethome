@@ -7,23 +7,25 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { Feed } from '@/types/feed'
 
 export default function Home() {
-  const [selectedFeed, setSelectedFeed] = useState<Feed | null>(null)
+  const [selectedFeeds, setSelectedFeeds] = useState<Feed[]>([])
+
+  const handleFeedSelect = (feed: Feed | null) => {
+    if (feed) {
+      setSelectedFeeds([feed])
+    } else {
+      setSelectedFeeds([]) // This will show all feeds
+    }
+  }
 
   return (
     <SidebarProvider>
-      <FeedSidebar onFeedSelect={setSelectedFeed} />
+      <FeedSidebar onFeedSelect={handleFeedSelect} selectedFeed={selectedFeeds[0] || null} />
       <SidebarInset>
-        {selectedFeed ? (
-          <ArticleList
-            feedId={selectedFeed.id}
-            feedName={selectedFeed.name}
-            feedDescription={selectedFeed.description || ""}
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-xl text-gray-500">Select a feed to view articles</p>
-          </div>
-        )}
+        <ArticleList
+          feedIds={selectedFeeds.map(feed => feed.id)}
+          feedName={selectedFeeds.length === 1 ? selectedFeeds[0].name : "Selected Feeds"}
+          feedDescription={selectedFeeds.length === 1 ? selectedFeeds[0].description || "" : "Articles from selected feeds"}
+        />
       </SidebarInset>
     </SidebarProvider>
   )
