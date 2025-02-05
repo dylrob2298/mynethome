@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Heart, ExternalLink, ImageOff, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { updateArticle } from '@/lib/api'
+import DOMPurify from 'dompurify'
 
 interface ArticleWidgetProps {
   article: Article
@@ -128,7 +129,10 @@ export function ArticleWidget({
             </div>
             <div 
               className="prose dark:prose-invert max-w-none"
-              dangerouslySetInnerHTML={{ __html: article.content || article.summary || "" }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(article.content || article.summary || "", {
+                ALLOWED_TAGS: ["p", "strong", "em", "b", "i", "ul", "li", "img"],
+                ALLOWED_ATTR: ["src", "alt", "title"],
+              } ) }}
             />
           </div>
         </ScrollArea>

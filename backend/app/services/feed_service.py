@@ -61,7 +61,7 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
             new_articles.append(parsed_article)
             new_articles_count += 1
 
-    await crud_article.associate_article_with_feed(db_session, feed_id, new_articles)
+    await crud_article.associate_new_articles_with_feed(db_session, feed_id, new_articles)
     
     return {
         "message": "Feed refreshed successfully.",

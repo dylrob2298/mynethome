@@ -44,6 +44,38 @@ async def associate_article_with_feed(db: AsyncSession, feed_id: int, article_da
 
     return article
 
+async def associate_new_articles_with_feed(
+    db: AsyncSession, feed_id: int, articles_data: list[ArticleCreate]
+) -> list[Article]:
+    """
+    Associates a list of articles with a feed.
+
+    :param db: The database session
+    :param feed_id: The ID of the feed
+    :param articles_data: A list of ArticleCreate objects
+    :return: A list of associated Article objects
+    """
+    # Fetch the feed
+    feed = await get_feed_by_id(db, feed_id)
+    if not feed:
+        raise ValueError(f"Feed with ID {feed_id} does not exist.")
+
+    associated_articles = []
+    db_articles = [Article(**article_in.model_dump()) for article_in in articles_data]
+    db.add_all(db_articles)
+
+    for article in db_articles:
+
+        # Associate the article with the feed
+        if article not in feed.articles:
+            feed.articles.append(article)
+            associated_articles.append(article)
+
+    # Commit the changes to the database
+    await db.commit()
+
+    return associated_articles
+
 async def update_article(db: AsyncSession, db_article: Article, article_data: ArticleUpdate) -> Article:
     for field, value in article_data.model_dump(exclude_unset=True).items():
         setattr(db_article, field, value)

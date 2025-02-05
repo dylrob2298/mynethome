@@ -1,5 +1,6 @@
 import feedparser
 from datetime import datetime, timezone
+from bs4 import BeautifulSoup
 
 from ..schemas.feed import FeedCreate
 from ..schemas.article import ArticleCreate
@@ -35,6 +36,24 @@ def get_entry_image(entry):
         return entry.get("image")
     if "thumbnail" in entry:
         return entry.get("thumbnail")
+    
+    # TODO: not sure about this
+    # def extract_first_image(html_content):
+    #     if not html_content:
+    #         return None
+    #     soup = BeautifulSoup(html_content, "html.parser")
+    #     img_tag = soup.find("img")  # Find the first <img> tag
+    #     if img_tag and "src" in img_tag.attrs:
+    #         return img_tag["src"]
+    #     return None
+    
+    # image_from_summary = extract_first_image(getattr(entry, "summary", None))
+    # if image_from_summary:
+    #     return image_from_summary
+
+    # image_from_description = extract_first_image(getattr(entry, "description", None))
+    # if image_from_description:
+    #     return image_from_description
     
     # No image found
     return None

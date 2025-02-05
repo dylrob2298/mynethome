@@ -1,22 +1,35 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { Feed } from '@/types/feed'
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarSeparator } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder } from 'lucide-react'
-import { AddFeedDialog } from './add-feed-dialog'
-import { EditFeedsWidget } from './edit-feeds-widget'
-import Image from 'next/image'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { useState } from "react"
+import type { Feed } from "@/types/feed"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+} from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder, Star } from "lucide-react"
+import { AddFeedDialog } from "./add-feed-dialog"
+import { EditFeedsWidget } from "./edit-feeds-widget"
+import Image from "next/image"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface FeedSidebarProps {
   onFeedSelect: (feed: Feed | null) => void
   onCategorySelect: (category: string | null) => void
+  onFavoritesSelect: (selected: boolean) => void
   selectedFeed: Feed | null
   selectedCategory: string | null
+  selectedFavorites: boolean
   onFeedsUpdate: (updatedFeeds: Feed[]) => void
   feeds: Feed[]
 }
@@ -25,8 +38,17 @@ interface GroupedFeeds {
   [key: string]: Feed[]
 }
 
-export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, selectedCategory, onFeedsUpdate, feeds }: FeedSidebarProps) {
-  const [searchTerm, setSearchTerm] = useState('')
+export function FeedSidebar({
+  onFeedSelect,
+  onCategorySelect,
+  onFavoritesSelect,
+  selectedFeed,
+  selectedCategory,
+  selectedFavorites,
+  onFeedsUpdate,
+  feeds,
+}: FeedSidebarProps) {
+  const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -38,7 +60,7 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
   const handleFeedsUpdate = (updatedFeeds: Feed[]) => {
     onFeedsUpdate(updatedFeeds)
     // If the currently selected feed was deleted, reset the selection
-    if (selectedFeed && !updatedFeeds.find(feed => feed.id === selectedFeed.id)) {
+    if (selectedFeed && !updatedFeeds.find((feed) => feed.id === selectedFeed.id)) {
       onFeedSelect(null)
     }
   }
@@ -48,14 +70,14 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
       const url = new URL(feedUrl)
       return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`
     } catch (error) {
-      console.error('Invalid URL:', feedUrl)
-      return '/placeholder.svg'
+      console.error("Invalid URL:", feedUrl)
+      return "/placeholder.svg"
     }
   }
 
   const toggleCategory = (category: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    setExpandedCategories(prev => {
+    setExpandedCategories((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(category)) {
         newSet.delete(category)
@@ -66,9 +88,10 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
     })
   }
 
-  const filteredFeeds = feeds.filter(feed =>
-    feed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (feed.category && feed.category.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredFeeds = feeds.filter(
+    (feed) =>
+      feed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (feed.category && feed.category.toLowerCase().includes(searchTerm.toLowerCase())),
   )
 
   const groupedFeeds = filteredFeeds.reduce((acc: GroupedFeeds, feed) => {
@@ -81,14 +104,14 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
     return acc
   }, {})
 
-  const uncategorizedFeeds = filteredFeeds.filter(feed => !feed.category)
+  const uncategorizedFeeds = filteredFeeds.filter((feed) => !feed.category)
 
   const renderFeedItem = (feed: Feed) => (
     <SidebarMenuItem key={feed.id}>
       <SidebarMenuButton
         asChild
         onClick={() => onFeedSelect(feed)}
-        className={`w-full justify-start ${selectedFeed?.id === feed.id ? 'bg-accent text-accent-foreground' : ''}`}
+        className={`w-full justify-start ${selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : ""}`}
       >
         <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
           <div className="flex-shrink-0 mr-3">
@@ -144,8 +167,9 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
                   onClick={() => {
                     onFeedSelect(null)
                     onCategorySelect(null)
+                    onFavoritesSelect(false)
                   }}
-                  className={`w-full justify-start ${!selectedFeed && !selectedCategory ? 'bg-accent text-accent-foreground' : ''}`}
+                  className={`w-full justify-start ${!selectedFeed && !selectedCategory && !selectedFavorites ? "bg-accent text-accent-foreground" : ""}`}
                 >
                   <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                     <Inbox className="mr-2 h-4 w-4" />
@@ -153,14 +177,27 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
                   </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  onClick={() => {
+                    onFeedSelect(null)
+                    onCategorySelect(null)
+                    onFavoritesSelect(true)
+                  }}
+                  className={`w-full justify-start ${selectedFavorites ? "bg-accent text-accent-foreground" : ""}`}
+                >
+                  <button className="flex items-center w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                    <Star className="mr-2 h-4 w-4" />
+                    <span className="font-medium">Favorites</span>
+                  </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarSeparator />
               {Object.entries(groupedFeeds).map(([category, categoryFeeds]) => (
-                <Collapsible
-                  key={category}
-                  open={expandedCategories.has(category)}
-                >
-                  <SidebarMenuButton 
-                    className={`w-full justify-start px-0 ${selectedCategory === category ? 'bg-accent text-accent-foreground' : ''}`}
+                <Collapsible key={category} open={expandedCategories.has(category)}>
+                  <SidebarMenuButton
+                    className={`w-full justify-start px-0 ${selectedCategory === category ? "bg-accent text-accent-foreground" : ""}`}
                     onClick={() => onCategorySelect(category)}
                   >
                     <button className="flex items-center justify-between w-full text-left py-2 px-3 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
@@ -179,9 +216,7 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
                       </CollapsibleTrigger>
                     </button>
                   </SidebarMenuButton>
-                  <CollapsibleContent>
-                    {categoryFeeds.map(renderFeedItem)}
-                  </CollapsibleContent>
+                  <CollapsibleContent>{categoryFeeds.map(renderFeedItem)}</CollapsibleContent>
                 </Collapsible>
               ))}
               {uncategorizedFeeds.length > 0 && (
@@ -195,11 +230,7 @@ export function FeedSidebar({ onFeedSelect, onCategorySelect, selectedFeed, sele
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <AddFeedDialog
-        isOpen={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onAddFeed={handleAddFeed}
-      />
+      <AddFeedDialog isOpen={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} onAddFeed={handleAddFeed} />
       <EditFeedsWidget
         isOpen={isEditWidgetOpen}
         onClose={() => setIsEditWidgetOpen(false)}
