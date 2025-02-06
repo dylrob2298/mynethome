@@ -20,6 +20,8 @@ async def handle_feed_addition(new_feed: FeedAdd, db_session: AsyncSession) -> F
     # Parse feed and articles
     try:
         parsed_feed, parsed_articles = parse_feed(url)
+        if not parsed_feed:
+            raise ValueError("error adding feed")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -40,7 +42,14 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
         raise HTTPException(status_code=404, detail="Feed not found.")
     
     try:
-        parsed_feed, parsed_articles = parse_feed(feed.url)
+        parsed_feed, parsed_articles = parse_feed(feed.url, feed.etag, feed.modified)
+        if not parsed_feed:
+            return {
+                "message": "Feed has no updates",
+                "feed": feed.url,
+                "new_articles": 0,
+                "updated_articles": 0
+            }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     

@@ -58,7 +58,7 @@ def get_entry_image(entry):
     # No image found
     return None
 
-def extract_feed_info(feed_info, url: str) -> FeedCreate:
+def extract_feed_info(feed_info, url: str, etag: str | None, modified: str | None) -> FeedCreate:
     image_url = (
         feed_info.get("image", {}).get("href") or
         feed_info.get("icon") or
@@ -70,7 +70,9 @@ def extract_feed_info(feed_info, url: str) -> FeedCreate:
         link=feed_info.get("link"),
         author=feed_info.get("author"),
         description=feed_info.get("subtitle"),
-        image_url=image_url
+        image_url=image_url,
+        etag=etag,
+        modified=modified
     )
 
 
@@ -107,7 +109,7 @@ def parse_article_entries(entries: list[dict]) -> list[ArticleCreate]:
 
     return articles
 
-def parse_feed(url: str) -> tuple[FeedCreate, list[ArticleCreate]]:
+def parse_feed(url: str, etag: str | None = None, modified: str | None = None) -> tuple[FeedCreate, list[ArticleCreate]] | tuple[None, None]:
     """
     Parses the given Feed URL using feedparser
     
@@ -116,13 +118,19 @@ def parse_feed(url: str) -> tuple[FeedCreate, list[ArticleCreate]]:
         
     Returns:
         FeedParsed: The parsed feed with parsed articles"""
-    feed_data = feedparser.parse(url)
+    feed_data = feedparser.parse(url, etag=etag, modified=modified)
+    
     if feed_data.bozo:
         raise ValueError(f"Error parsing feed from {url}: {feed_data.bozo_exception}")
+    if feed_data.status == 304:
+        # feed not updated, no new data
+        return None, None
     
     feed_info = feed_data.feed
+    new_etag = feed_data.get("etag")
+    new_modified = feed_data.get("modified")
     entries_info = feed_data.entries
-    feed = extract_feed_info(feed_info, url)
+    feed = extract_feed_info(feed_info, url, new_etag, new_modified)
     articles = parse_article_entries(entries_info)
 
     return feed, articles

@@ -16,7 +16,8 @@ class Feed(Base):
     image_url: Mapped[str | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), nullable=False)
     last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
-    
+    modified: Mapped[str | None] = mapped_column(nullable=True)
+    etag: Mapped[str | None] = mapped_column(nullable=True)
 
     articles: Mapped[list["Article"]] = relationship( # type: ignore
         "Article", secondary="feed_articles", back_populates="feeds", lazy="selectin"

@@ -10,6 +10,8 @@ class FeedBase(BaseSchema):
     description: str | None = None
     author: str | None = None
     image_url: HttpUrl | None = None
+    etag: str | None = None
+    modified: str | None = None
 
 class FeedAdd(BaseModel):
     url: str
