@@ -70,7 +70,7 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
             new_articles.append(parsed_article)
             new_articles_count += 1
 
-    await crud_article.associate_new_articles_with_feed(db_session, feed_id, new_articles)
+    await bulk_operations.bulk_associate_articles_with_feed(db_session, feed_id, new_articles)
     
     return {
         "message": "Feed refreshed successfully.",
@@ -79,5 +79,25 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
         "updated_articles": updated_articles_count,
     }
 
+async def handle_refresh_all_feeds(db_session: AsyncSession):
+    """Handles refreshing all subscribed RSS Feeds"""
+    feeds = await crud_feed.get_all_feeds(db_session)
+
+    results = []
+    for feed in feeds:
+        try:
+            refresh_result = await handle_refresh_feed(feed.id, db_session)
+            results.append(refresh_result)
+        except HTTPException as e:
+            results.append({
+                "feed": feed.url,
+                "message": str(e)
+            })
+    
+    return {
+        "message": "feeds refreshed",
+        "results": results
+    }
+  
 
 

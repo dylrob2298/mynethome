@@ -4,9 +4,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from .core.config import settings
 from .db.session import sessionmanager
 from .routers import articles, feeds
+from .utils.utils import scheduled_refresh_feeds
+
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG if settings.debug_logs else logging.INFO)
 
@@ -21,7 +26,23 @@ async def lifespan(app: FastAPI):
     Function that handles startup and shutdown events.
     To understand more, read https://fastapi.tiangolo.com/advanced/events/
     """
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        scheduled_refresh_feeds,
+        "cron",
+        hour="6,18",
+        name="daily_feeds_refresh"
+    )
+
+    scheduler.add_job(scheduled_refresh_feeds, "interval", minutes=1)
+
+
+    scheduler.start()
+
     yield
+
+    scheduler.shutdown()
+
     if sessionmanager._engine is not None:
         # Close the DB connection
         await sessionmanager.close()

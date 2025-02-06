@@ -24,12 +24,17 @@ async def bulk_associate_articles_with_feed(
     existing_articles = (await db.execute(existing_articles_query)).scalars().all()
     existing_links = {article.link for article in existing_articles}
 
+    unique_new_links = set()
+
     # Create new articles for links that do not exist
-    new_articles_data = [
-        Article(**article.model_dump())
-        for article in articles_data
-        if str(article.link) not in existing_links
-    ]
+    new_articles_data = []
+    
+    for article_in in articles_data:
+        article_link = str(article_in.link)
+        if article_link not in existing_links and article_link not in unique_new_links:
+            new_articles_data.append(Article(**article_in.model_dump()))
+            unique_new_links.add(article_link)
+    
     db.add_all(new_articles_data)  # Bulk add new articles
     await db.commit()  # Commit new articles to assign IDs
 

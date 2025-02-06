@@ -2,6 +2,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..schemas.feed import FeedOut
 from ..db.crud.crud_article import get_article_counts_for_feeds
 from ..db.models.feed import Feed
+from ..db.session import sessionmanager
+from ..services.feed_service import handle_refresh_all_feeds
 
 async def enrich_feeds(
     db_session: AsyncSession, feeds: list[Feed]
@@ -35,3 +37,10 @@ async def enrich_feeds(
         )
         for feed in feeds
     ]
+
+async def scheduled_refresh_feeds():
+    async with sessionmanager.session() as db_session:
+        results = await handle_refresh_all_feeds(db_session)
+
+    print("All feeds refreshed via job")
+    print(results)
