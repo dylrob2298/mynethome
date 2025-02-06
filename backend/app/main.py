@@ -34,7 +34,8 @@ async def lifespan(app: FastAPI):
         name="daily_feeds_refresh"
     )
 
-    scheduler.add_job(scheduled_refresh_feeds, "interval", minutes=1)
+    # job to quickly test scheduled_refresh_feeds
+    # scheduler.add_job(scheduled_refresh_feeds, "interval", minutes=1)
 
 
     scheduler.start()
