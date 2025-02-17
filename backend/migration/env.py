@@ -6,6 +6,8 @@ from app.db.base import Base  # Your application's SQLAlchemy Base
 from app.db.models.feed import Feed
 from app.db.models.article import Article
 from app.db.models.feed_articles import FeedArticles
+from app.db.models.channel import Channel
+from app.db.models.video import Video
 from app.core.config import settings  # Your database settings
 
 # This is the Alembic Config object, which provides access to the .ini file values.

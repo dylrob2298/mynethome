@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .core.config import settings
 from .db.session import sessionmanager
-from .routers import articles, feeds
+from .routers import articles, feeds, youtube
 from .utils.utils import scheduled_refresh_feeds
 
 
@@ -30,8 +30,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         scheduled_refresh_feeds,
         "cron",
-        hour="6,18",
-        name="daily_feeds_refresh"
+        hour="0,6,12,18",
+        name="daily_feeds_refresh",
+        misfire_grace_time=3600,
+        coalesce=True
     )
 
     # job to quickly test scheduled_refresh_feeds
@@ -60,6 +62,7 @@ app.add_middleware(
 
 app.include_router(feeds.router)
 app.include_router(articles.router)
+app.include_router(youtube.router)
 
 @app.get("/")
 async def root():

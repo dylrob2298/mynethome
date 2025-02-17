@@ -1,1 +1,26 @@
 Generic single-database configuration.
+
+4. Reapply Initial Migration
+If you suspect the database is out of sync with your migration history:
+
+Delete the database volume if necessary to start fresh:
+bash
+Copy
+Edit
+docker-compose down -v
+docker-compose up -d
+Recreate the initial migration:
+bash
+Copy
+Edit
+docker-compose run --rm backend alembic revision --autogenerate -m "Initial migration"
+Apply the migration:
+bash
+Copy
+Edit
+docker-compose run --rm backend alembic upgrade head
+
+
+alembic revision --autogenerate -m "Add channels and videos table"
+alembic upgrade head
+
