@@ -11,7 +11,7 @@ class ArticleBase(BaseSchema):
     content: str | None = None
     image_url: HttpUrl | None = None
     categories: list[str] | None = None
-    published_at: datetime
+    published_at: datetime | None = None
     updated_at: datetime | None = None
 
 class ArticleCreate(ArticleBase):

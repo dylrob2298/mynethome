@@ -1,5 +1,8 @@
-from sqlalchemy import select, insert
+from datetime import datetime, timezone
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..models.article import Article
 from ..models.feed import Feed
 from ..models.feed_articles import FeedArticles
@@ -8,64 +11,115 @@ from ...schemas.article import ArticleCreate
 async def bulk_associate_articles_with_feed(
     db: AsyncSession, feed_id: int, articles_data: list[ArticleCreate]
 ) -> dict:
-    # Fetch the feed
+    """
+    Inserts or updates Articles in bulk (using Postgres upsert) 
+    and associates them with the given Feed. 
+    
+    - On conflict for Articles (unique link), we update title, 
+      published_at, updated_at, author, summary, content, image_url, 
+      categories, etc.
+    - For the junction table (FeedArticles), we do "ON CONFLICT DO NOTHING"
+      so we don't re-insert an existing (feed_id, article_id) pair.
+    - Duplicates in articles_data (by link) are removed to avoid 
+      redundant inserts/upserts.
+
+    Returns:
+        dict of counts:
+        {
+            "new_articles_count": int,
+            "existing_articles_count": int,
+            "new_relationships_count": int,
+        }
+    """
+
+    # If there's nothing to process, return early
+    if not articles_data:
+        return {
+            "new_articles_count": 0,
+            "existing_articles_count": 0,
+            "new_relationships_count": 0,
+        }
+
+    # 1) Ensure the feed exists
     feed_query = select(Feed).where(Feed.id == feed_id)
     feed = (await db.execute(feed_query)).scalars().first()
     if not feed:
         raise ValueError(f"Feed with ID {feed_id} does not exist.")
-    
-    # Extract article links for deduplication
-    article_links = [str(article.link) for article in articles_data]
 
-    # Fetch existing articles by link
-    existing_articles_query = (
-        select(Article).where(Article.link.in_(article_links))
+    # -------------------------------------------------------------------------
+    # Deduplicate `articles_data` by link to ensure we only upsert one row
+    # per unique link.
+    # If you want to keep the *last* instance of a given link instead of the
+    # first, you can iterate in reversed(...) or adjust logic accordingly.
+    # -------------------------------------------------------------------------
+    unique_links = set()
+    deduplicated_articles: list[ArticleCreate] = []
+    for article in articles_data:
+        if article.link not in unique_links:
+            deduplicated_articles.append(article)
+            unique_links.add(article.link)
+    # Now `deduplicated_articles` has only one entry per link
+
+    # 2) Extract the incoming links
+    incoming_links = [str(a.link) for a in deduplicated_articles]
+
+    # 3) Check existing links in the DB for counting new vs. existing
+    existing_links_query = select(Article.link).where(Article.link.in_(incoming_links))
+    existing_links_in_db = set((await db.execute(existing_links_query)).scalars().all())
+
+    # 4) Convert ArticleCreate items to dict for bulk insert
+    article_dicts = [item.model_dump() for item in deduplicated_articles]
+
+    # 5) Upsert (insert on conflict do update) Articles
+    stmt = (
+        pg_insert(Article)
+        .values(article_dicts)
+        .on_conflict_do_update(
+            constraint="articles_link_key",  # or index_elements=["link"]
+            set_={
+                "title":        pg_insert(Article).excluded.title,
+                # "published_at": pg_insert(Article).excluded.published_at,
+                "updated_at":   pg_insert(Article).excluded.updated_at,
+                "author":       pg_insert(Article).excluded.author,
+                "summary":      pg_insert(Article).excluded.summary,
+                "content":      pg_insert(Article).excluded.content,
+                "image_url":    pg_insert(Article).excluded.image_url,
+                "categories":   pg_insert(Article).excluded.categories,
+                # Possibly also update is_favorited, is_read, etc.
+            },
+        )
+        .returning(Article.id, Article.link)
     )
-    existing_articles = (await db.execute(existing_articles_query)).scalars().all()
-    existing_links = {article.link for article in existing_articles}
 
-    unique_new_links = set()
+    result = await db.execute(stmt)
+    await db.commit()
 
-    # Create new articles for links that do not exist
-    new_articles_data = []
-    
-    for article_in in articles_data:
-        article_link = str(article_in.link)
-        if article_link not in existing_links and article_link not in unique_new_links:
-            new_articles_data.append(Article(**article_in.model_dump()))
-            unique_new_links.add(article_link)
-    
-    db.add_all(new_articles_data)  # Bulk add new articles
-    await db.commit()  # Commit new articles to assign IDs
+    rows = result.fetchall()  # list of (id, link)
+    link_to_id = {r.link: r.id for r in rows}
 
-    # Refresh to get IDs for newly created articles
-    for new_article in new_articles_data:
-        await db.refresh(new_article)
+    # 6) Count how many new vs. how many updated
+    new_articles_count = sum(1 for link in link_to_id if link not in existing_links_in_db)
+    existing_articles_count = len(link_to_id) - new_articles_count
 
-    # Combine all articles (new + existing)
-    all_articles = {article.link: article for article in existing_articles + new_articles_data}
-
-    # Fetch existing feed-article relationships
-    existing_relationships_query = (
-        select(FeedArticles.article_id)
-        .where(FeedArticles.feed_id == feed_id)
-        .join(Article, FeedArticles.article_id == Article.id)
-        .where(Article.link.in_(article_links))
-    )
-    existing_relationships = {row[0] for row in (await db.execute(existing_relationships_query)).all()}
-
-    # Prepare new relationships for bulk insert
-    new_relationships = [
-        {"feed_id": feed_id, "article_id": article.id}
-        for article in all_articles.values()
-        if article.id not in existing_relationships
+    # 7) Insert into feed_articles table with ON CONFLICT DO NOTHING
+    feed_article_values = [
+        {"feed_id": feed_id, "article_id": link_to_id[link]}
+        for link in link_to_id
     ]
-    if new_relationships:
-        await db.execute(insert(FeedArticles), new_relationships)
-        await db.commit()
+    stmt_feed_articles = (
+        pg_insert(FeedArticles)
+        .values(feed_article_values)
+        .on_conflict_do_nothing(index_elements=["feed_id", "article_id"])
+        .returning(FeedArticles.article_id)
+    )
+    result_feed_articles = await db.execute(stmt_feed_articles)
+    await db.commit()
+
+    new_relationship_article_ids = result_feed_articles.scalars().all()
+    new_relationships_count = len(new_relationship_article_ids)
 
     return {
-        "new_articles_count": len(new_articles_data),
-        "existing_articles_count": len(existing_articles),
-        "new_relationships_count": len(new_relationships),
+        "new_articles_count": new_articles_count,
+        "existing_articles_count": existing_articles_count,
+        "new_relationships_count": new_relationships_count,
     }

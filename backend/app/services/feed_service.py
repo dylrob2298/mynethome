@@ -1,6 +1,8 @@
 # app/services/feed_service.py
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timezone, timedelta
+
 from ..utils.feedparse import parse_feed
 from ..db.crud import crud_feed, crud_article, bulk_operations
 from ..schemas.feed import FeedAdd, FeedOut, FeedCreate
@@ -23,6 +25,8 @@ async def handle_feed_addition(new_feed: FeedAdd, db_session: AsyncSession) -> F
         if not parsed_feed:
             raise ValueError("error adding feed")
     except ValueError as e:
+        print("here")
+        print(e)
         raise HTTPException(status_code=400, detail=str(e))
 
     # Add category
@@ -40,7 +44,12 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
     feed = await crud_feed.get_feed_by_id(db_session, feed_id)
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found.")
-    
+    now = datetime.now(timezone.utc)
+    if (now - feed.last_updated) < timedelta(hours=1):
+        return {
+            "message": "Feed recently updated. No need to refresh."
+        }
+
     try:
         parsed_feed, parsed_articles = parse_feed(feed.url, feed.etag, feed.modified)
         if not parsed_feed:
@@ -53,30 +62,12 @@ async def handle_refresh_feed(feed_id: int, db_session: AsyncSession):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
-    new_articles_count = 0
-    updated_articles_count = 0
-
-    new_articles: list[ArticleCreate] = []
-
-    for parsed_article in parsed_articles:
-        existing_article = await crud_article.get_article_by_link(db_session, str(parsed_article.link))
-
-        if existing_article:
-            if parsed_article.updated_at and existing_article.updated_at < parsed_article.updated_at:
-                article_update = ArticleUpdate(**parsed_article.model_dump())
-                await crud_article.update_article(db_session, existing_article, article_update)
-                updated_articles_count += 1
-        else:
-            new_articles.append(parsed_article)
-            new_articles_count += 1
-
-    await bulk_operations.bulk_associate_articles_with_feed(db_session, feed_id, new_articles)
+    response = await bulk_operations.bulk_associate_articles_with_feed(db_session, feed_id, parsed_articles)
     
     return {
         "message": "Feed refreshed successfully.",
         "feed": parsed_feed,
-        "new_articles": new_articles_count,
-        "updated_articles": updated_articles_count,
+        "response": response
     }
 
 async def handle_refresh_all_feeds(db_session: AsyncSession):
