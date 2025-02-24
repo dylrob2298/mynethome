@@ -3,6 +3,7 @@ from sqlalchemy import delete, select
 from ..models.feed import Feed
 from ..models.article import Article
 from ..models.feed_articles import FeedArticles
+from ..models.category import Category
 from ...schemas.feed import FeedCreate, FeedUpdate, FeedSearchParams
 
 async def create_feed(db: AsyncSession, feed_in: FeedCreate) -> Feed:
@@ -64,14 +65,31 @@ async def delete_feed(db: AsyncSession, feed_id: int) -> None:
     await db.commit()
 
 async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
-    query = select(Feed)
+    # Start with distinct feeds to avoid duplicates if a feed matches multiple categories
+    query = select(Feed).distinct()
 
-    if params.name:
-        query = query.where(Feed.name.ilike(f"%{params.name}%"))
-    
+    # If filtering by multiple categories
+    if params.categories and len(params.categories) > 0:
+        query = (
+            query
+            .join(Feed.categories)      # many-to-many join
+            .where(Category.name.in_(params.categories))
+        )
+
+    # (Optional) If you want to keep the old single `category` field:
     if params.category:
         query = query.where(Feed.category.ilike(f"%{params.category}%"))
 
+    if params.name:
+        query = query.where(Feed.name.ilike(f"%{params.name}%"))
+
+    if params.description:
+        query = query.where(Feed.description.ilike(f"%{params.description}%"))
+
+    if params.author:
+        query = query.where(Feed.author.ilike(f"%{params.author}%"))
+
+    # Order By
     if params.order_by == "name":
         query = query.order_by(Feed.name.asc())
     elif params.order_by == "created_at":
@@ -79,7 +97,9 @@ async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
     elif params.order_by == "last_updated":
         query = query.order_by(Feed.last_updated.desc())
 
+    # Pagination
     query = query.limit(params.limit).offset(params.offset)
 
+    # Execute and return
     result = await db.execute(query)
     return result.scalars().all()

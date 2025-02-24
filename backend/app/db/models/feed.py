@@ -22,3 +22,5 @@ class Feed(Base):
     articles: Mapped[list["Article"]] = relationship( # type: ignore
         "Article", secondary="feed_articles", back_populates="feeds", lazy="selectin"
     )
+
+    categories: Mapped[list["Category"]] = relationship("Category", secondary="feed_categories", back_populates="feeds") # type: ignore

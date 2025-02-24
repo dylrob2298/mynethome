@@ -37,6 +37,7 @@ class FeedOut(FeedBase):
 class FeedSearchParams(BaseModel):
     name: str | None = None
     category: str | None = None
+    categories: list[str] = []
     description: str | None = None
     author: str | None = None
     order_by: Literal["created_at", "last_updated", "name"] = "name"

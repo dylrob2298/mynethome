@@ -3,6 +3,7 @@ export interface Feed {
   name: string;
   url: string; // Corresponding to Pydantic's HttpUrl
   category?: string | null;
+  categories?: string[] | null;
   description?: string | null;
   author?: string | null;
   image_url?: string | null; // Corresponding to Pydantic's HttpUrl
