@@ -5,6 +5,7 @@ from sqlalchemy import select, delete
 
 # Import your models
 from ..models.channel import Channel
+from ..models.category import Category
 # Import your Pydantic schemas (example names)
 from ...schemas.channel import ChannelCreate, ChannelUpdate, ChannelSearchParams
 
@@ -42,6 +43,14 @@ async def get_channels(db: AsyncSession, params: ChannelSearchParams) -> list[Ch
     Return all channels matching the given search params in the database
     """
     query = select(Channel)
+
+    # If filtering by multiple categories
+    if params.categories and len(params.categories) > 0:
+        query = (
+            query
+            .join(Channel.categories)      # many-to-many join
+            .where(Category.name.in_(params.categories))
+        )
     
     if params.title:
         query = query.where(Channel.title.ilike(f"%{params.title}%"))

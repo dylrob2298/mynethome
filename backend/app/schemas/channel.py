@@ -32,7 +32,7 @@ class ChannelUpdate(BaseModel):
 
 class ChannelSearchParams(BaseModel):
     title: str | None = None
-    category: str | None = None
+    categories: list[str] = []
     order_by: Literal["created_at", "last_updated", "title"] = "title"
     limit: int = Field(100, gt=0, le=100)
     offset: int = Field(0, ge=0)

@@ -8,7 +8,7 @@ from app.db.models.article import Article
 from app.db.models.feed_articles import FeedArticles
 from app.db.models.channel import Channel
 from app.db.models.video import Video
-from app.db.models.category import Category, FeedCategory
+from app.db.models.category import Category, FeedCategory, ChannelCategory
 from app.core.config import settings
 
 # This is the Alembic Config object, which provides access to the .ini file values.

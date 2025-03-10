@@ -21,3 +21,5 @@ class Channel(Base):
         back_populates="channel",
         cascade="all, delete-orphan"
     )
+
+    categories: Mapped[list["Category"]] = relationship("Category", secondary="channel_categories", back_populates="channels") # type: ignore

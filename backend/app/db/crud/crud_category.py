@@ -5,6 +5,7 @@ from typing import List
 
 from ..models.category import Category
 from ..models.feed import Feed
+from ..models.channel import Channel
 from ...schemas.category import CategoryCreate, CategoryUpdate
 
 async def create_category(db: AsyncSession, category_in: CategoryCreate) -> Category:
@@ -118,6 +119,54 @@ async def remove_feed_from_category(db: AsyncSession, category_id: int, feed_id:
 
     if db_feed in db_category.feeds:
         db_category.feeds.remove(db_feed)
+
+    await db.commit()
+    await db.refresh(db_category)
+    return db_category
+
+
+async def add_channel_to_category(db: AsyncSession, category_id: int, channel_id: int) -> Category:
+    """
+    Add a channel to a category (many-to-many).
+    Returns the updated Category object.
+    """
+    db_category = await get_category_by_id(db, category_id)
+    if not db_category:
+        raise ValueError(f"Category with ID {category_id} does not exist.")
+
+    query_channel = select().where(Channel.id == channel_id)
+    result_channel = await db.execute(query_channel)
+    db_channel = result_channel.scalars().first()
+
+    if not db_channel:
+        raise ValueError(f"Channel with ID {channel_id} does not exist.")
+
+    if db_channel not in db_category.channels:
+        db_category.channels.append(db_channel)
+
+    await db.commit()
+    await db.refresh(db_category)
+    return db_category
+
+
+async def remove_channel_from_category(db: AsyncSession, category_id: int, channel_id: int) -> Category:
+    """
+    Remove a channel from a category (many-to-many).
+    Returns the updated Category object.
+    """
+    db_category = await get_category_by_id(db, category_id)
+    if not db_category:
+        raise ValueError(f"Category with ID {category_id} does not exist.")
+
+    query_channel = select(Channel).where(Channel.id == channel_id)
+    result_channel = await db.execute(query_channel)
+    db_channel = result_channel.scalars().first()
+
+    if not db_channel:
+        raise ValueError(f"Channel with ID {channel_id} does not exist.")
+
+    if db_channel in db_category.channels:
+        db_category.channels.remove(db_channel)
 
     await db.commit()
     await db.refresh(db_category)
