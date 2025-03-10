@@ -55,7 +55,7 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
           limit: ARTICLES_PER_PAGE,
           offset: (page - 1) * ARTICLES_PER_PAGE,
           order_by: "published_at",
-          is_favorited: showFavorites,
+          is_favorited: showFavorites ? showFavorites : undefined,
         })
         setArticles(fetchedArticles)
         setTotalArticles(total_count)

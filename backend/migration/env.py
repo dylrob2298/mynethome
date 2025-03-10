@@ -2,14 +2,14 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from sqlalchemy.engine import Connection
 from alembic import context
-from app.db.base import Base  # Your application's SQLAlchemy Base
+from app.db.base import Base
 from app.db.models.feed import Feed
 from app.db.models.article import Article
 from app.db.models.feed_articles import FeedArticles
 from app.db.models.channel import Channel
 from app.db.models.video import Video
 from app.db.models.category import Category, FeedCategory
-from app.core.config import settings  # Your database settings
+from app.core.config import settings
 
 # This is the Alembic Config object, which provides access to the .ini file values.
 config = context.config
