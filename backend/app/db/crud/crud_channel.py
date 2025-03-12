@@ -2,6 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 
 # Import your models
 from ..models.channel import Channel
@@ -42,7 +43,7 @@ async def get_channels(db: AsyncSession, params: ChannelSearchParams) -> list[Ch
     """
     Return all channels matching the given search params in the database
     """
-    query = select(Channel)
+    query = select(Channel).options(selectinload(Channel.categories))  # 🔹 Explicitly load categories
 
     # If filtering by multiple categories
     if params.categories and len(params.categories) > 0:
@@ -54,12 +55,9 @@ async def get_channels(db: AsyncSession, params: ChannelSearchParams) -> list[Ch
     
     if params.title:
         query = query.where(Channel.title.ilike(f"%{params.title}%"))
-    
-    if params.category:
-        query = query.where(Channel.category.ilike(f"%{params.category}%"))
 
     if params.order_by == "title":
-        query = query.order_by(Channel.name.asc())
+        query = query.order_by(Channel.title.asc())
     elif params.order_by == "created_at":
         query = query.order_by(Channel.created_at.desc())
     elif params.order_by == "last_updated":

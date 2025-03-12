@@ -67,6 +67,7 @@ class YouTubeAPI:
     def get_channel_info(
         self,
         channel_id: str = None,
+        handle: str = None,
         username: str = None,
         parts: str = "snippet,contentDetails,statistics"
     ) -> Dict[str, Any]:
@@ -74,16 +75,18 @@ class YouTubeAPI:
         Retrieves channel details for a given channel ID or username.
 
         :param channel_id: The channel ID (e.g., UC_xxx...).
+        :param handle: The channel handle
         :param username: The channel username (legacy).
         :param parts: The parts to request, default snippet,contentDetails,statistics.
         :return: The API response dict for the channel.
         """
-        if not channel_id and not username:
-            raise ValueError("You must provide either channel_id or username.")
+        if not channel_id and not handle:
+            raise ValueError("You must provide either channel_id or handle or username.")
 
         request = self.youtube.channels().list(
             part=parts,
             id=channel_id,
+            forHandle=handle,
             forUsername=username
         )
         response = request.execute()

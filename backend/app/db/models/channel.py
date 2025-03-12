@@ -8,6 +8,7 @@ class Channel(Base):
 
     id: Mapped[str] = mapped_column(primary_key=True, index=True)
     title: Mapped[str] = mapped_column(nullable=False)
+    handle: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     uploads_id: Mapped[str] = mapped_column(nullable=False)
     thumbnail_url: Mapped[str | None] = mapped_column(nullable=True)
@@ -22,4 +23,4 @@ class Channel(Base):
         cascade="all, delete-orphan"
     )
 
-    categories: Mapped[list["Category"]] = relationship("Category", secondary="channel_categories", back_populates="channels") # type: ignore
+    categories: Mapped[list["Category"]] = relationship("Category", secondary="channel_categories", back_populates="channels", lazy="joined") # type: ignore

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { format, parseISO } from "date-fns"
 import Image from "next/image"
 import type { Article } from "@/types/article"
@@ -9,20 +9,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ArticleWidget } from "./article-widget"
 import { AnimatePresence, motion } from "framer-motion"
-import { Heart, RefreshCw, LayoutGrid, List, ImageOff, ExternalLink } from "lucide-react"
+import { Heart, RefreshCw, LayoutGrid, List, ImageOff, ExternalLink, Search, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toggle } from "@/components/ui/toggle"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-} from "@/components/ui/pagination"
+import { Input } from "@/components/ui/input"
 import { getArticles, updateArticle, refreshFeed, getAllFeedIds } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { UnifiedPagination } from "./unified-pagination"
 import DOMPurify from "dompurify"
 
 interface ArticleListProps {
@@ -41,42 +34,83 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
   const [isGridView, setIsGridView] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPaginationLoading, setIsPaginationLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [totalArticles, setTotalArticles] = useState(0)
   const [allFeedIds, setAllFeedIds] = useState<number[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const contentRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
+
+  // Create a key to track when filters change to reset pagination
+  const filterKey = JSON.stringify({
+    feedIds,
+    showFavorites,
+    searchTerm: debouncedSearchTerm,
+  })
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Reset page when filter key changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterKey])
 
   const fetchArticles = useCallback(
     async (page: number) => {
       try {
-        setIsLoading(true)
+        // Use different loading states for initial load vs pagination
+        if (page === 1) {
+          setIsLoading(true)
+          setIsPaginationLoading(false)
+        } else {
+          setIsPaginationLoading(true)
+        }
+
         const { articles: fetchedArticles, total_count } = await getArticles({
           feed_ids: feedIds.length > 0 ? feedIds : undefined,
+          title: debouncedSearchTerm || undefined,
           limit: ARTICLES_PER_PAGE,
           offset: (page - 1) * ARTICLES_PER_PAGE,
           order_by: "published_at",
-          is_favorited: showFavorites ? showFavorites : undefined,
+          is_favorited: showFavorites ? true : undefined,
         })
+
         setArticles(fetchedArticles)
         setTotalArticles(total_count)
         setError(null)
+
+        // Scroll to top when changing pages
+        if (contentRef.current && page > 1) {
+          contentRef.current.scrollTop = 0
+        }
       } catch (err) {
+        console.error("Error fetching articles:", err)
         setError("Failed to fetch articles")
+        toast({
+          title: "Error",
+          description: "Failed to fetch articles. Please try again.",
+          variant: "destructive",
+        })
       } finally {
         setIsLoading(false)
+        setIsPaginationLoading(false)
       }
     },
-    [feedIds, showFavorites],
+    [feedIds, debouncedSearchTerm, showFavorites, toast],
   )
 
-  useEffect(() => {
-    setCurrentPage(1)
-    fetchArticles(1)
-  }, [feedIds, showFavorites, fetchArticles])
-
+  // Fetch articles when page, search term, feed IDs, or favorites filter changes
   useEffect(() => {
     fetchArticles(currentPage)
-  }, [currentPage, fetchArticles])
+  }, [currentPage, debouncedSearchTerm, feedIds, showFavorites, fetchArticles])
 
   useEffect(() => {
     const fetchAllFeedIds = async () => {
@@ -242,74 +276,9 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
     </div>
   )
 
-  const renderPagination = () => {
-    const totalPages = Math.ceil(totalArticles / ARTICLES_PER_PAGE)
-    if (totalPages <= 1) return null
-
-    const maxVisiblePages = 5
-    const pageNumbers = []
-
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
-    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
-
-    if (endPage - startPage + 1 < maxVisiblePages) {
-      startPage = Math.max(1, endPage - maxVisiblePages + 1)
-    }
-
-    if (startPage > 1) {
-      pageNumbers.push(1)
-      if (startPage > 2) {
-        pageNumbers.push("...")
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i)
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...")
-      }
-      pageNumbers.push(totalPages)
-    }
-
-    return (
-      <Pagination>
-        <PaginationContent className="flex justify-between items-center w-full">
-          <PaginationItem>
-            <PaginationPrevious
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              isActive={currentPage > 1}
-            />
-          </PaginationItem>
-          <div className="flex-1 flex justify-center items-center space-x-1">
-            {pageNumbers.map((page, index) => (
-              <PaginationItem key={index}>
-                {page === "..." ? (
-                  <PaginationEllipsis />
-                ) : (
-                  <PaginationLink onClick={() => setCurrentPage(page as number)} isActive={currentPage === page}>
-                    {page}
-                  </PaginationLink>
-                )}
-              </PaginationItem>
-            ))}
-          </div>
-          <PaginationItem>
-            <PaginationNext
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-              isActive={currentPage < totalPages}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    )
-  }
-
   return (
     <div className="relative w-full h-full overflow-hidden bg-gray-50 dark:bg-gray-900 max-w-full">
-      <div className="w-full h-full p-4">
+      <div className="w-full h-full p-4 flex flex-col">
         <div className="flex flex-col mb-6">
           <div className="flex flex-row items-center justify-between mb-2">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{feedName}</h1>
@@ -325,19 +294,82 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
           </div>
           {feedDescription && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{feedDescription}</p>}
         </div>
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          {isLoading ? (
-            <p>Loading articles...</p>
-          ) : error ? (
-            <p className="text-red-500">{error}</p>
-          ) : isGridView ? (
-            renderGridView()
-          ) : (
-            renderListView()
+
+        {/* Search input */}
+        <div className="relative mb-4">
+          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 transform text-gray-500 dark:text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Search articles..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            disabled={isLoading}
+          />
+        </div>
+
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1" ref={contentRef}>
+            {isLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <p>Loading articles...</p>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-40 text-center">
+                <AlertCircle className="h-8 w-8 text-red-500 mb-2" />
+                <p className="text-red-500 mb-4">{error}</p>
+                <Button onClick={() => fetchArticles(currentPage)}>Try Again</Button>
+              </div>
+            ) : articles.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-center">
+                <p className="text-gray-500 mb-2">
+                  {debouncedSearchTerm
+                    ? "No articles match your search"
+                    : showFavorites
+                      ? "You haven't favorited any articles yet"
+                      : "No articles found for the selected feeds"}
+                </p>
+                {debouncedSearchTerm && (
+                  <Button variant="outline" onClick={() => setSearchTerm("")}>
+                    Clear Search
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className={`${isPaginationLoading ? "opacity-60 pointer-events-none" : ""}`}>
+                {isGridView ? renderGridView() : renderListView()}
+              </div>
+            )}
+
+            {/* Pagination loading indicator */}
+            {isPaginationLoading && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-10 dark:bg-opacity-20 backdrop-blur-[1px] z-10">
+                <div className="bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          {/* Pagination footer - moved outside ScrollArea */}
+          {!isLoading && articles.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <UnifiedPagination
+                totalItems={totalArticles}
+                itemsPerPage={ARTICLES_PER_PAGE}
+                currentPage={currentPage}
+                onPageChange={setCurrentPage}
+                isLoading={isPaginationLoading}
+                showSummary={true}
+                itemName="articles"
+              />
+            </div>
           )}
-        </ScrollArea>
-        <div className="mt-6">{renderPagination()}</div>
+        </div>
       </div>
+
       <AnimatePresence>
         {selectedArticle && (
           <motion.div
@@ -346,7 +378,7 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="fixed top-0 right-0 w-full h-full bg-white dark:bg-gray-900 shadow-lg z-50"
-            style={{ width: "calc(100% - var(--sidebar-width))" }}
+            style={{ width: "calc(100% - 64px)" }}
           >
             <ArticleWidget
               article={selectedArticle}

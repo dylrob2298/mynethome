@@ -1,7 +1,8 @@
 # crud_video.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, distinct
+from sqlalchemy.orm import aliased
 from sqlalchemy.dialects.postgresql import insert
 
 from ..models.video import Video
@@ -61,47 +62,65 @@ async def get_all_videos(db: AsyncSession) -> list[Video]:
     result = await db.execute(query)
     return result.scalars().all()
 
-async def get_videos(db: AsyncSession, params: VideoSearchParams) -> list[Video]:
+async def get_videos(db: AsyncSession, params: VideoSearchParams) -> tuple[list[Video], int]:
     """
-    Retrieve videos matching the given search parameters:
+    Retrieve videos matching the given search parameters and return paginated results along with the total count.
     - Filter by channel_ids, title, description, is_favorited
     - Order by created_at, last_updated, published_at, or title
     - Support pagination via limit & offset
     """
 
-    query = select(Video)
+    # Alias to ensure clarity in column selection
+    video_alias = aliased(Video)
+
+    # Base query to fetch videos
+    query = select(
+        *[getattr(video_alias, col) for col in Video.__table__.columns.keys()]
+    )
+
+    # Base query to count total matching videos (without pagination)
+    total_query = select(func.count(distinct(video_alias.id)))
 
     # 1) Apply filters
     if params.channel_ids:
-        query = query.where(Video.channel_id.in_(params.channel_ids))
+        query = query.where(video_alias.channel_id.in_(params.channel_ids))
+        total_query = total_query.where(video_alias.channel_id.in_(params.channel_ids))
+
     if params.title:
-        # case-insensitive substring match
-        query = query.where(Video.title.ilike(f"%{params.title}%"))
+        query = query.where(video_alias.title.ilike(f"%{params.title}%"))
+        total_query = total_query.where(video_alias.title.ilike(f"%{params.title}%"))
+
     if params.description:
-        query = query.where(Video.description.ilike(f"%{params.description}%"))
+        query = query.where(video_alias.description.ilike(f"%{params.description}%"))
+        total_query = total_query.where(video_alias.description.ilike(f"%{params.description}%"))
+
     if params.is_favorited is not None:
-        query = query.where(Video.is_favorited == params.is_favorited)
+        query = query.where(video_alias.is_favorited == params.is_favorited)
+        total_query = total_query.where(video_alias.is_favorited == params.is_favorited)
 
-    # 2) Order by user-specified field
-    #    By default, we do descending for datetime fields, ascending for title.
+    # 2) Sorting based on user preference
     if params.order_by == "created_at":
-        query = query.order_by(Video.created_at.desc())
+        query = query.order_by(video_alias.created_at.desc())
     elif params.order_by == "last_updated":
-        query = query.order_by(Video.last_updated.desc())
+        query = query.order_by(video_alias.last_updated.desc())
     elif params.order_by == "published_at":
-        query = query.order_by(Video.published_at.desc())
+        query = query.order_by(video_alias.published_at.desc())
     elif params.order_by == "title":
-        query = query.order_by(Video.title.asc())
+        query = query.order_by(video_alias.title.asc())
     else:
-        # Just in case, fallback
-        query = query.order_by(Video.published_at.desc())
+        query = query.order_by(video_alias.published_at.desc())  # Default order
 
-    # 3) Pagination
-    query = query.limit(params.limit).offset(params.offset)
+    # 3) Apply Pagination
+    paginated_query = query.limit(params.limit).offset(params.offset)
 
-    # 4) Execute the query
-    result = await db.execute(query)
-    return result.scalars().all()
+    # 4) Execute Queries
+    result = await db.execute(paginated_query)
+    total_count = await db.scalar(total_query)
+
+    # Convert results to Video objects
+    videos = [Video(**row._asdict()) for row in result]
+
+    return videos, total_count
 
 async def update_video(db: AsyncSession, video_id: str, video_update: VideoUpdate) -> Video:
     """

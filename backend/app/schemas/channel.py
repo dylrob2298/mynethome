@@ -1,19 +1,20 @@
 from pydantic import BaseModel, HttpUrl, Field
 from .base import BaseSchema
+from .category import CategoryOut
 from datetime import datetime
 from typing import Literal
 
 class ChannelBase(BaseSchema):
     id: str
     title: str
+    handle: str | None = None
     description: str | None = None
     uploads_id: str
     thumbnail_url: HttpUrl | None = None
-    category: str | None = None
 
 class ChannelAddParams(BaseModel):
-    username: str
-    category: str | None = None
+    handle: str
+    categories: list[str] = []
 
 class ChannelCreate(ChannelBase):
     pass
@@ -22,12 +23,12 @@ class ChannelOut(ChannelBase):
     created_at: datetime
     last_updated: datetime
     is_favorited: bool
+    total_videos: int = 0
+    categories: list[CategoryOut] = []
 
 class ChannelUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
-    thumbnail_url: HttpUrl | None = None
-    category: str | None = None
     is_favorited: bool | None = None
 
 class ChannelSearchParams(BaseModel):

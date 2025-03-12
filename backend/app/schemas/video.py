@@ -22,7 +22,6 @@ class VideoOut(VideoBase):
 class VideoUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
-    thumbnail_url: HttpUrl | None = None
     is_favorited: bool | None = None
 
 class VideoSearchParams(BaseModel):
@@ -33,3 +32,7 @@ class VideoSearchParams(BaseModel):
     order_by: Literal["created_at", "last_updated", "published_at", "title"] = "published_at"
     limit: int = Field(100, gt=0, le=100)
     offset: int = Field(0, ge=0)
+
+class VideoSearchResponse(BaseSchema):
+    videos: list[VideoOut]
+    total_count: int

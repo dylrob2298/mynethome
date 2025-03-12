@@ -9,12 +9,12 @@ from ..schemas.video import VideoCreate
 from ..db.crud import crud_channel, crud_video
 from ..db.session import sessionmanager
 
-async def handle_add_channel(new_channel_username: str, db_session: AsyncSession, ytapi: YouTubeAPI) -> ChannelOut:
+async def handle_add_channel(new_channel_handle: str, db_session: AsyncSession, ytapi: YouTubeAPI) -> ChannelOut:
     '''
     Handles the addition of a new YouTube Channel and retrieving its uploaded videos
     '''
     
-    response = ytapi.get_channel_info(username=new_channel_username)
+    response = ytapi.get_channel_info(handle=new_channel_handle)
     items = response.get("items", [])
     if not items:
         raise HTTPException(status_code=404, detail="Channel not found on YouTube.")
@@ -37,6 +37,7 @@ async def handle_add_channel(new_channel_username: str, db_session: AsyncSession
     new_channel_data = ChannelCreate(
         id=channel_id,
         title=snippet.get("title"),
+        handle=new_channel_handle,
         description=snippet.get("description"),
         uploads_id=related_playlists.get("uploads"),
         thumbnail_url=thumbnail_url,  # <--- storing the selected thumbnail
