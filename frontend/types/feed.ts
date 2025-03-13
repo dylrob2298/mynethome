@@ -1,9 +1,14 @@
+
+export interface CategoryOut {
+  id: number
+  name: string
+}
+
 export interface Feed {
   id: number;
   name: string;
   url: string; // Corresponding to Pydantic's HttpUrl
-  category?: string | null;
-  categories?: string[] | null;
+  categories: CategoryOut[];
   description?: string | null;
   author?: string | null;
   image_url?: string | null; // Corresponding to Pydantic's HttpUrl

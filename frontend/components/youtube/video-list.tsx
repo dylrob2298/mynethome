@@ -16,7 +16,7 @@ import { getVideos, toggleVideoFavorite } from "@/lib/youtube-api"
 import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { VideoPlayer } from "./video-player"
-import { UnifiedPagination } from "./unified-pagination"
+import { UnifiedPagination } from "../unified-pagination"
 
 interface VideoListProps {
   channelIds: string[]

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { PageLayout } from "@/components/page-layout"
-import { VideoList } from "@/components/video-list"
-import { ChannelSidebarSimple } from "@/components/channel-sidebar-simple"
+import { VideoList } from "@/components/youtube/video-list"
+import { ChannelSidebarSimple } from "@/components/youtube/channel-sidebar-simple"
 import type { Channel } from "@/types/youtube"
 import { getChannels } from "@/lib/youtube-api"
 import { useToast } from "@/hooks/use-toast"

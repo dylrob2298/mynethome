@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, select
+from sqlalchemy.orm import selectinload
 from ..models.feed import Feed
 from ..models.article import Article
 from ..models.feed_articles import FeedArticles
@@ -66,7 +67,7 @@ async def delete_feed(db: AsyncSession, feed_id: int) -> None:
 
 async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
     # Start with distinct feeds to avoid duplicates if a feed matches multiple categories
-    query = select(Feed).distinct()
+    query = select(Feed).options(selectinload(Feed.categories)).distinct()
 
     # If filtering by multiple categories
     if params.categories and len(params.categories) > 0:

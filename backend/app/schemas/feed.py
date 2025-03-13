@@ -1,5 +1,6 @@
 from pydantic import BaseModel, HttpUrl, Field
 from .base import BaseSchema
+from .category import CategoryOut
 from datetime import datetime
 from typing import Literal
 
@@ -29,6 +30,7 @@ class FeedOut(FeedBase):
     created_at: datetime
     last_updated: datetime
     total_articles: int = 0
+    categories: list[CategoryOut] = []
 
     model_config = {
         "from_attributes": True

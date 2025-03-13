@@ -15,7 +15,7 @@ import { Toggle } from "@/components/ui/toggle"
 import { Input } from "@/components/ui/input"
 import { getArticles, updateArticle, refreshFeed, getAllFeedIds } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
-import { UnifiedPagination } from "./unified-pagination"
+import { UnifiedPagination } from "../unified-pagination"
 import DOMPurify from "dompurify"
 
 interface ArticleListProps {
@@ -75,12 +75,12 @@ export function ArticleList({ feedIds, feedName, feedDescription, showFavorites 
         }
 
         const { articles: fetchedArticles, total_count } = await getArticles({
-          feed_ids: feedIds.length > 0 ? feedIds : undefined,
+          feedIds: feedIds.length > 0 ? feedIds : undefined,
           title: debouncedSearchTerm || undefined,
           limit: ARTICLES_PER_PAGE,
           offset: (page - 1) * ARTICLES_PER_PAGE,
-          order_by: "published_at",
-          is_favorited: showFavorites ? true : undefined,
+          orderBy: "published_at",
+          isFavorited: showFavorites ? true : undefined,
         })
 
         setArticles(fetchedArticles)

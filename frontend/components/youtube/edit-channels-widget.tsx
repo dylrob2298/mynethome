@@ -7,7 +7,7 @@ import { getChannels, deleteChannel } from "@/lib/youtube-api"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Trash2, Loader2, Search } from "lucide-react"
+import { Trash2, Loader2, Search, Tag } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { ChannelCategoryManager } from "@/components/channel-category-manager"
 
 interface EditChannelsWidgetProps {
   isOpen: boolean
@@ -37,6 +38,8 @@ export function EditChannelsWidget({ isOpen, onClose, onChannelsUpdate }: EditCh
   const [searchTerm, setSearchTerm] = useState("")
   const [channelToDelete, setChannelToDelete] = useState<Channel | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null)
+  const [showCategoryManager, setShowCategoryManager] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -112,6 +115,34 @@ export function EditChannelsWidget({ isOpen, onClose, onChannelsUpdate }: EditCh
     }
   }
 
+  const handleManageCategories = (channel: Channel) => {
+    setSelectedChannel({ ...channel })
+    setShowCategoryManager(true)
+  }
+
+  const handleCategoryUpdate = () => {
+    // The channel object is updated directly in the ChannelCategoryManager
+    setShowCategoryManager(false)
+
+    // Update the channels list to reflect the changes
+    if (selectedChannel) {
+      const updatedChannels = channels.map((channel) =>
+        channel.id === selectedChannel.id ? { ...channel, categories: [...selectedChannel.categories] } : channel,
+      )
+      setChannels(updatedChannels)
+      setFilteredChannels(
+        searchTerm.trim() === ""
+          ? updatedChannels
+          : updatedChannels.filter(
+              (channel) =>
+                channel.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                channel.categories.some((cat) => cat.name.toLowerCase().includes(searchTerm.toLowerCase())),
+            ),
+      )
+      onChannelsUpdate(updatedChannels)
+    }
+  }
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -181,14 +212,24 @@ export function EditChannelsWidget({ isOpen, onClose, onChannelsUpdate }: EditCh
                         </div>
                       )}
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => confirmDeleteChannel(channel)}
-                      title="Delete channel"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
+                    <div className="flex space-x-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleManageCategories(channel)}
+                        title="Manage categories"
+                      >
+                        <Tag className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => confirmDeleteChannel(channel)}
+                        title="Delete channel"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -224,6 +265,16 @@ export function EditChannelsWidget({ isOpen, onClose, onChannelsUpdate }: EditCh
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Category Manager Dialog */}
+      {selectedChannel && (
+        <ChannelCategoryManager
+          channel={selectedChannel}
+          onUpdate={handleCategoryUpdate}
+          open={showCategoryManager}
+          onOpenChange={setShowCategoryManager}
+        />
+      )}
     </>
   )
 }

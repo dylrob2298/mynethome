@@ -3,7 +3,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Channel } from "@/types/youtube"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toggleChannelFavorite } from "@/lib/youtube-api"
 import { useToast } from "@/hooks/use-toast"
+import { getAllCategories } from "@/lib/category-service"
+import type { CategoryOut } from "@/types/category"
 
 interface ChannelSidebarProps {
   onChannelSelect: (channel: Channel | null) => void
@@ -49,8 +51,22 @@ export function ChannelSidebarSimple({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
-  const [filteredChannels, setFilteredChannels] = useState<Channel[]>([])
+  const [allCategories, setAllCategories] = useState<CategoryOut[]>([])
   const { toast } = useToast()
+
+  useEffect(() => {
+    // Fetch all categories when the component mounts
+    const fetchCategories = async () => {
+      try {
+        const categories = await getAllCategories()
+        setAllCategories(categories)
+      } catch (error) {
+        console.error("Failed to fetch categories:", error)
+      }
+    }
+
+    fetchCategories()
+  }, [])
 
   // Filter channels based on search term
   const getFilteredChannels = () => {
@@ -123,12 +139,10 @@ export function ChannelSidebarSimple({
   const getGroupedChannels = () => {
     const filtered = getFilteredChannels()
     const grouped: GroupedChannels = {}
-    const categoryNames = new Set<string>()
 
     filtered.forEach((channel) => {
       channel.categories.forEach((category) => {
         const categoryName = category.name
-        categoryNames.add(categoryName)
 
         if (!grouped[categoryName]) {
           grouped[categoryName] = []

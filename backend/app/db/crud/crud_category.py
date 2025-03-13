@@ -45,7 +45,7 @@ async def get_all_categories(db: AsyncSession) -> List[Category]:
     """
     query = select(Category)
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.unique().scalars().all()
 
 
 async def update_category(db: AsyncSession, category_id: int, category_in: CategoryUpdate) -> Category:
@@ -98,6 +98,7 @@ async def add_feed_to_category(db: AsyncSession, category_id: int, feed_id: int)
 
     await db.commit()
     await db.refresh(db_category)
+    await db.refresh(db_feed)
     return db_category
 
 
@@ -134,7 +135,7 @@ async def add_channel_to_category(db: AsyncSession, category_id: int, channel_id
     if not db_category:
         raise ValueError(f"Category with ID {category_id} does not exist.")
 
-    query_channel = select().where(Channel.id == channel_id)
+    query_channel = select(Channel).where(Channel.id == channel_id)
     result_channel = await db.execute(query_channel)
     db_channel = result_channel.scalars().first()
 

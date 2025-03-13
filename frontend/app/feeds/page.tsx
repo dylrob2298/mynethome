@@ -6,8 +6,8 @@ import type { Feed } from "@/types/feed"
 import { getFeeds } from "@/lib/api"
 
 // Import components but don't wrap them in SidebarProvider
-import { FeedSidebar } from "@/components/feed-sidebar-simple"
-import { ArticleList } from "@/components/article-list"
+import { FeedSidebarSimple } from "@/components/feeds/feed-sidebar-simple"
+import { ArticleList } from "@/components/feeds/article-list"
 
 export default function FeedPage() {
   const [selectedFeeds, setSelectedFeeds] = useState<Feed[]>([])
@@ -58,7 +58,10 @@ export default function FeedPage() {
       return [] // We'll fetch all favorite articles regardless of feed
     }
     if (selectedCategory) {
-      return allFeeds.filter((feed) => feed.category === selectedCategory).map((feed) => feed.id)
+      // Find feeds that have the selected category in their categories array
+      return allFeeds
+        .filter((feed) => feed.categories && feed.categories.some((cat) => cat.name === selectedCategory))
+        .map((feed) => feed.id)
     }
     return selectedFeeds.length > 0 ? selectedFeeds.map((feed) => feed.id) : allFeeds.map((feed) => feed.id)
   }
@@ -79,7 +82,7 @@ export default function FeedPage() {
 
   // Create sidebar and content components for the layout
   const sidebar = (
-    <FeedSidebar
+    <FeedSidebarSimple
       onFeedSelect={handleFeedSelect}
       onCategorySelect={handleCategorySelect}
       onFavoritesSelect={handleFavoritesSelect}

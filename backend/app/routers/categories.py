@@ -10,6 +10,10 @@ router = APIRouter(
     tags=["categories"]
 )
 
+@router.get("/", response_model=list[CategoryOut])
+async def get_all_categories(db_session: DBSessionDep):
+    return await crud_category.get_all_categories(db_session)
+
 @router.post("/create", response_model=CategoryOut)
 async def create_category(db_session: DBSessionDep, new_cat: CategoryCreate):
     return await crud_category.create_category(db_session, category_in=new_cat)

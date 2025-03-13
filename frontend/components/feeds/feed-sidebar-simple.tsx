@@ -3,7 +3,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { Feed } from "@/types/feed"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,8 @@ import { EditFeedsWidget } from "./edit-feeds-widget"
 import Image from "next/image"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
+import { getAllCategories } from "@/lib/category-service"
+import type { CategoryOut } from "@/types/category"
 
 interface FeedSidebarProps {
   onFeedSelect: (feed: Feed | null) => void
@@ -29,7 +31,7 @@ interface GroupedFeeds {
   [key: string]: Feed[]
 }
 
-export function FeedSidebar({
+export function FeedSidebarSimple({
   onFeedSelect,
   onCategorySelect,
   onFavoritesSelect,
@@ -43,6 +45,21 @@ export function FeedSidebar({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [allCategories, setAllCategories] = useState<CategoryOut[]>([])
+
+  useEffect(() => {
+    // Fetch all categories when the component mounts
+    const fetchCategories = async () => {
+      try {
+        const categories = await getAllCategories()
+        setAllCategories(categories)
+      } catch (error) {
+        console.error("Failed to fetch categories:", error)
+      }
+    }
+
+    fetchCategories()
+  }, [])
 
   const handleAddFeed = (newFeed: Feed) => {
     onFeedsUpdate([...feeds, newFeed])
@@ -82,20 +99,30 @@ export function FeedSidebar({
   const filteredFeeds = feeds.filter(
     (feed) =>
       feed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (feed.category && feed.category.toLowerCase().includes(searchTerm.toLowerCase())),
+      (feed.categories && feed.categories.some((cat) => cat.name.toLowerCase().includes(searchTerm.toLowerCase()))),
   )
 
-  const groupedFeeds = filteredFeeds.reduce((acc: GroupedFeeds, feed) => {
-    if (feed.category) {
-      if (!acc[feed.category]) {
-        acc[feed.category] = []
-      }
-      acc[feed.category].push(feed)
-    }
-    return acc
-  }, {})
+  // Group feeds by category
+  const groupedFeeds: GroupedFeeds = {}
 
-  const uncategorizedFeeds = filteredFeeds.filter((feed) => !feed.category)
+  // Add feeds to their respective category groups
+  filteredFeeds.forEach((feed) => {
+    if (feed.categories && feed.categories.length > 0) {
+      feed.categories.forEach((category) => {
+        const categoryName = category.name
+        if (!groupedFeeds[categoryName]) {
+          groupedFeeds[categoryName] = []
+        }
+        // Only add the feed if it's not already in this category group
+        if (!groupedFeeds[categoryName].some((f) => f.id === feed.id)) {
+          groupedFeeds[categoryName].push(feed)
+        }
+      })
+    }
+  })
+
+  // Get feeds that don't have any categories
+  const uncategorizedFeeds = filteredFeeds.filter((feed) => !feed.categories || feed.categories.length === 0)
 
   return (
     <div className="h-full flex flex-col">

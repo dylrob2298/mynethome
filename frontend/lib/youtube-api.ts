@@ -8,8 +8,17 @@ import type {
   VideoSearchResponse,
   Video,
 } from "@/types/youtube"
+import { getAllCategories } from "@/lib/category-service"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// Helper function to ensure channel has categories array
+function ensureChannelCategories(channel: Channel): Channel {
+  return {
+    ...channel,
+    categories: Array.isArray(channel.categories) ? channel.categories : [],
+  }
+}
 
 export async function getChannels(params?: ChannelSearchParams): Promise<Channel[]> {
   const searchParams = new URLSearchParams()
@@ -32,7 +41,8 @@ export async function getChannels(params?: ChannelSearchParams): Promise<Channel
       throw new Error(errorData?.detail || "Failed to fetch channels")
     }
 
-    return response.json()
+    const channels = await response.json()
+    return channels.map(ensureChannelCategories)
   } catch (error) {
     console.error("Error fetching channels:", error)
     throw error
@@ -48,7 +58,8 @@ export async function getChannelById(channelId: string): Promise<Channel> {
       throw new Error(errorData?.detail || "Failed to fetch channel")
     }
 
-    return response.json()
+    const channel = await response.json()
+    return ensureChannelCategories(channel)
   } catch (error) {
     console.error(`Error fetching channel ${channelId}:`, error)
     throw error
@@ -70,7 +81,8 @@ export async function addChannel(channelData: ChannelAdd): Promise<Channel> {
       throw new Error(errorData?.detail || "Failed to add channel")
     }
 
-    return response.json()
+    const channel = await response.json()
+    return ensureChannelCategories(channel)
   } catch (error) {
     console.error("Error adding channel:", error)
     throw error
@@ -92,7 +104,8 @@ export async function updateChannel(channelId: string, updateData: ChannelUpdate
       throw new Error(errorData?.detail || "Failed to update channel")
     }
 
-    return response.json()
+    const channel = await response.json()
+    return ensureChannelCategories(channel)
   } catch (error) {
     console.error(`Error updating channel ${channelId}:`, error)
     throw error
@@ -187,16 +200,9 @@ export async function getAllChannelIds(): Promise<string[]> {
 
 export async function getCategoryNames(): Promise<string[]> {
   try {
-    const channels = await getChannels()
-    const categorySet = new Set<string>()
-
-    channels.forEach((channel) => {
-      channel.categories.forEach((category) => {
-        categorySet.add(category.name)
-      })
-    })
-
-    return Array.from(categorySet)
+    // Use the getAllCategories function from category-service instead
+    const categories = await getAllCategories()
+    return categories.map((category) => category.name)
   } catch (error) {
     console.error("Error getting category names:", error)
     throw error
