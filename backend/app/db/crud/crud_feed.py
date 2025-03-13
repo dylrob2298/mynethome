@@ -102,4 +102,4 @@ async def get_feeds(db: AsyncSession, params: FeedSearchParams) -> list[Feed]:
 
     # Execute and return
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.unique().scalars().all()

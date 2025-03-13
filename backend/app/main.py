@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from .core.config import settings
 from .db.session import sessionmanager
-from .routers import articles, feeds, youtube
+from .routers import articles, feeds, youtube, categories
 from .utils.utils import scheduled_refresh_feeds
 
 
@@ -63,6 +63,7 @@ app.add_middleware(
 app.include_router(feeds.router)
 app.include_router(articles.router)
 app.include_router(youtube.router)
+app.include_router(categories.router)
 
 @app.get("/")
 async def root():

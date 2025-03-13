@@ -12,3 +12,12 @@ class CategoryUpdate(BaseModel):
 
 class CategoryOut(CategoryBase):
     id: int
+
+class UpdateFeedCategory(BaseSchema):
+    category_id: int
+    feed_id: int
+
+class UpdateChannelCategory(BaseSchema):
+    category_id: int
+    channel_id: str
+    
