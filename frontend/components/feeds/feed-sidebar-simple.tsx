@@ -7,14 +7,17 @@ import { useState, useEffect } from "react"
 import type { Feed } from "@/types/feed"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder, Star } from "lucide-react"
+import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder, Star, Heart, Minus } from "lucide-react"
 import { AddFeedDialog } from "./add-feed-dialog"
 import { EditFeedsWidget } from "./edit-feeds-widget"
 import Image from "next/image"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import { getAllCategories } from "@/lib/category-service"
 import type { CategoryOut } from "@/types/category"
+import { toggleFeedFavorite } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 interface FeedSidebarProps {
   onFeedSelect: (feed: Feed | null) => void
@@ -46,6 +49,7 @@ export function FeedSidebarSimple({
   const [isEditWidgetOpen, setIsEditWidgetOpen] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [allCategories, setAllCategories] = useState<CategoryOut[]>([])
+  const { toast } = useToast()
 
   useEffect(() => {
     // Fetch all categories when the component mounts
@@ -96,11 +100,37 @@ export function FeedSidebarSimple({
     })
   }
 
+  const handleToggleFavorite = async (feed: Feed, event: React.MouseEvent) => {
+    event.stopPropagation()
+    try {
+      const updatedFeed = await toggleFeedFavorite(feed.id, !feed.is_favorited)
+
+      // Update the feeds list with the updated feed
+      const updatedFeeds = feeds.map((f) => (f.id === updatedFeed.id ? updatedFeed : f))
+
+      onFeedsUpdate(updatedFeeds)
+
+      toast({
+        title: updatedFeed.is_favorited ? "Feed favorited" : "Feed unfavorited",
+        description: `${updatedFeed.name} has been ${updatedFeed.is_favorited ? "added to" : "removed from"} your favorites.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update favorite status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const filteredFeeds = feeds.filter(
     (feed) =>
       feed.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (feed.categories && feed.categories.some((cat) => cat.name.toLowerCase().includes(searchTerm.toLowerCase()))),
   )
+
+  // Get favorite feeds
+  const favoriteFeeds = filteredFeeds.filter((feed) => feed.is_favorited)
 
   // Group feeds by category
   const groupedFeeds: GroupedFeeds = {}
@@ -170,6 +200,9 @@ export function FeedSidebarSimple({
           >
             <Inbox className="mr-2 h-4 w-4" />
             <span className="font-medium">All Feeds</span>
+            <Badge variant="outline" className="ml-auto text-xs">
+              {feeds.length}
+            </Badge>
           </button>
 
           <button
@@ -183,11 +216,59 @@ export function FeedSidebarSimple({
             }`}
           >
             <Star className="mr-2 h-4 w-4" />
-            <span className="font-medium">Favorites</span>
+            <span className="font-medium">Favorite Articles</span>
           </button>
         </div>
 
         <Separator className="my-2" />
+
+        {/* Favorite Feeds */}
+        {favoriteFeeds.length > 0 && (
+          <>
+            <div className="text-xs font-medium text-muted-foreground px-3 py-1">Favorite Feeds</div>
+            <div className="space-y-1 mt-1">
+              {favoriteFeeds.map((feed) => (
+                <div key={feed.id} className="flex items-center">
+                  <button
+                    onClick={() => onFeedSelect(feed)}
+                    className={`flex-1 flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                      selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                    }`}
+                  >
+                    <div className="flex-shrink-0 mr-2 relative">
+                      <Image
+                        src={feed.image_url || getFaviconUrl(feed.url)}
+                        alt={`${feed.name} icon`}
+                        width={16}
+                        height={16}
+                        className="rounded-sm"
+                      />
+                      {feed.is_favorited && (
+                        <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5">
+                          <Heart className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="truncate">{feed.name}</span>
+                    {feed.total_articles > 0 && (
+                      <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                        {feed.total_articles}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => handleToggleFavorite(feed, e)}
+                    className="p-1.5 rounded-md text-muted-foreground hover:bg-accent/50 hover:opacity-100 opacity-0 transition-opacity"
+                    title="Remove from favorites"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <Separator className="my-2" />
+          </>
+        )}
 
         {/* Categories */}
         {Object.entries(groupedFeeds).map(([category, categoryFeeds]) => (
@@ -201,6 +282,9 @@ export function FeedSidebarSimple({
               >
                 <Folder className="mr-2 h-4 w-4" />
                 <span>{category}</span>
+                <Badge variant="outline" className="ml-2 text-xs">
+                  {categoryFeeds.length}
+                </Badge>
               </button>
               <CollapsibleTrigger asChild onClick={(e) => toggleCategory(category, e)}>
                 <button className="p-1 rounded-sm hover:bg-accent-foreground/10">
@@ -215,24 +299,41 @@ export function FeedSidebarSimple({
             <CollapsibleContent>
               <div className="ml-6 space-y-1 mt-1">
                 {categoryFeeds.map((feed) => (
-                  <button
-                    key={feed.id}
-                    onClick={() => onFeedSelect(feed)}
-                    className={`w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                      selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                    }`}
-                  >
-                    <div className="flex-shrink-0 mr-2">
-                      <Image
-                        src={feed.image_url || getFaviconUrl(feed.url)}
-                        alt={`${feed.name} icon`}
-                        width={16}
-                        height={16}
-                        className="rounded-sm"
-                      />
-                    </div>
-                    <span className="truncate">{feed.name}</span>
-                  </button>
+                  <div key={feed.id} className="flex items-center group">
+                    <button
+                      onClick={() => onFeedSelect(feed)}
+                      className={`flex-1 flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                        selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                      }`}
+                    >
+                      <div className="flex-shrink-0 mr-2 relative">
+                        <Image
+                          src={feed.image_url || getFaviconUrl(feed.url)}
+                          alt={`${feed.name} icon`}
+                          width={16}
+                          height={16}
+                          className="rounded-sm"
+                        />
+                        {feed.is_favorited && (
+                          <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5">
+                            <Heart className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="truncate">{feed.name}</span>
+                      {feed.total_articles > 0 && (
+                        <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                          {feed.total_articles}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => handleToggleFavorite(feed, e)}
+                      className={`p-1.5 rounded-md ${feed.is_favorited ? "text-red-500" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
+                    >
+                      <Heart className={`h-4 w-4 ${feed.is_favorited ? "fill-red-500" : ""}`} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </CollapsibleContent>
@@ -243,27 +344,49 @@ export function FeedSidebarSimple({
         {uncategorizedFeeds.length > 0 && (
           <>
             <Separator className="my-2" />
-            <div className="text-xs font-medium text-muted-foreground px-3 py-1">Uncategorized</div>
+            <div className="text-xs font-medium text-muted-foreground px-3 py-1">
+              Uncategorized
+              <Badge variant="outline" className="ml-2 text-xs">
+                {uncategorizedFeeds.length}
+              </Badge>
+            </div>
             <div className="space-y-1 mt-1">
               {uncategorizedFeeds.map((feed) => (
-                <button
-                  key={feed.id}
-                  onClick={() => onFeedSelect(feed)}
-                  className={`w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                    selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                  }`}
-                >
-                  <div className="flex-shrink-0 mr-2">
-                    <Image
-                      src={feed.image_url || getFaviconUrl(feed.url)}
-                      alt={`${feed.name} icon`}
-                      width={16}
-                      height={16}
-                      className="rounded-sm"
-                    />
-                  </div>
-                  <span className="truncate">{feed.name}</span>
-                </button>
+                <div key={feed.id} className="flex items-center group">
+                  <button
+                    onClick={() => onFeedSelect(feed)}
+                    className={`flex-1 flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                      selectedFeed?.id === feed.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                    }`}
+                  >
+                    <div className="flex-shrink-0 mr-2 relative">
+                      <Image
+                        src={feed.image_url || getFaviconUrl(feed.url)}
+                        alt={`${feed.name} icon`}
+                        width={16}
+                        height={16}
+                        className="rounded-sm"
+                      />
+                      {feed.is_favorited && (
+                        <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5">
+                          <Heart className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                        </div>
+                      )}
+                    </div>
+                    <span className="truncate">{feed.name}</span>
+                    {feed.total_articles > 0 && (
+                      <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                        {feed.total_articles}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={(e) => handleToggleFavorite(feed, e)}
+                    className={`p-1.5 rounded-md ${feed.is_favorited ? "text-red-500" : "opacity-0 group-hover:opacity-100"} transition-opacity`}
+                  >
+                    <Heart className={`h-4 w-4 ${feed.is_favorited ? "fill-red-500" : ""}`} />
+                  </button>
+                </div>
               ))}
             </div>
           </>

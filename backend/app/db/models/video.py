@@ -15,6 +15,6 @@ class Video(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), nullable=False)
     last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
 
-    channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id"), nullable=False)
+    channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), nullable=False)
 
     channel: Mapped["Channel"] = relationship("Channel", back_populates="videos") # type: ignore

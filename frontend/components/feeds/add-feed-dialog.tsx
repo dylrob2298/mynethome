@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client"
 
 import type React from "react"
@@ -51,23 +50,32 @@ export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps
         // Add the feed without any categories first
         const newFeed = await addFeed({ url: url.trim() })
 
-        // Then add the feed to each selected category
-        const categoryPromises = selectedCategories.map(async (category) => {
-          await addFeedToCategory({
-            category_id: category.id,
-            feed_id: newFeed.id,
-          })
-        })
-
-        await Promise.all(categoryPromises)
-
-        // Update the feed object with categories for the UI
-        const feedWithCategories = {
-          ...newFeed,
-          categories: selectedCategories,
+        // Initialize categories array if it doesn't exist
+        if (!newFeed.categories) {
+          newFeed.categories = []
         }
 
-        onAddFeed(feedWithCategories)
+        // Then add the feed to each selected category
+        if (selectedCategories.length > 0) {
+          const categoryPromises = selectedCategories.map(async (category) => {
+            await addFeedToCategory({
+              category_id: category.id,
+              feed_id: newFeed.id,
+            })
+          })
+
+          await Promise.all(categoryPromises)
+
+          // Update the feed object with categories for the UI
+          newFeed.categories = selectedCategories
+        }
+
+        // Ensure is_favorited property is set
+        if (newFeed.is_favorited === undefined) {
+          newFeed.is_favorited = false
+        }
+
+        onAddFeed(newFeed)
         setUrl("")
         setSelectedCategories([])
         onClose()
@@ -77,6 +85,7 @@ export function AddFeedDialog({ isOpen, onClose, onAddFeed }: AddFeedDialogProps
           description: `${newFeed.name} has been added to your feed list${selectedCategories.length > 0 ? ` with ${selectedCategories.length} categories` : ""}.`,
         })
       } catch (error) {
+        console.error("Error adding feed:", error)
         toast({
           title: "Error",
           description: "Failed to add feed. Please try again.",

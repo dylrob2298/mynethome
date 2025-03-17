@@ -3,13 +3,13 @@
 
 import { useState, useEffect } from "react"
 import type { Feed } from "@/types/feed"
-import { getFeeds, editFeed, deleteFeed } from "@/lib/api"
+import { getFeeds, editFeed, deleteFeed, toggleFeedFavorite } from "@/lib/api"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Edit, Check, X, Trash2, Tag } from "lucide-react"
+import { Edit, Check, X, Trash2, Tag, Heart } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { FeedCategoryManager } from "@/components/feed-category-manager"
@@ -122,6 +122,27 @@ export function EditFeedsWidget({ isOpen, onClose, onFeedsUpdate }: EditFeedsWid
     }
   }
 
+  const handleToggleFavorite = async (feed: Feed) => {
+    try {
+      const updatedFeed = await toggleFeedFavorite(feed.id, !feed.is_favorited)
+
+      const updatedFeeds = feeds.map((f) => (f.id === updatedFeed.id ? updatedFeed : f))
+      setFeeds(updatedFeeds)
+      onFeedsUpdate(updatedFeeds)
+
+      toast({
+        title: updatedFeed.is_favorited ? "Feed favorited" : "Feed unfavorited",
+        description: `${updatedFeed.name} has been ${updatedFeed.is_favorited ? "added to" : "removed from"} your favorites.`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update favorite status. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
@@ -162,10 +183,22 @@ export function EditFeedsWidget({ isOpen, onClose, onFeedsUpdate }: EditFeedsWid
                   ) : (
                     <>
                       <div className="flex items-center justify-between">
-                        <p className="font-medium">{feed.name}</p>
+                        <div className="flex items-center">
+                          <p className="font-medium">{feed.name}</p>
+                          {feed.is_favorited && <Heart className="h-4 w-4 ml-2 fill-red-500 text-red-500" />}
+                        </div>
                         <div className="flex space-x-1">
                           <Button size="icon" variant="ghost" onClick={() => handleEditClick(feed)} title="Edit feed">
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleToggleFavorite(feed)}
+                            title={feed.is_favorited ? "Remove from favorites" : "Add to favorites"}
+                            className={feed.is_favorited ? "text-red-500" : ""}
+                          >
+                            <Heart className={`h-4 w-4 ${feed.is_favorited ? "fill-red-500" : ""}`} />
                           </Button>
                           <Button
                             size="icon"

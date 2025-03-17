@@ -71,17 +71,31 @@ export function AddChannelDialog({ isOpen, onClose, onAddChannel }: AddChannelDi
           handle: handle.trim(),
         })
 
+        // Initialize categories array if it doesn't exist
+        if (!newChannel.categories) {
+          newChannel.categories = []
+        }
+
         // Then add the channel to each selected category
-        const categoryPromises = selectedCategories.map(async (category) => {
-          await addChannelToCategory({
-            category_id: category.id,
-            channel_id: newChannel.id,
+        if (selectedCategories.length > 0) {
+          const categoryPromises = selectedCategories.map(async (category) => {
+            await addChannelToCategory({
+              category_id: category.id,
+              channel_id: newChannel.id,
+            })
           })
-        })
 
-        await Promise.all(categoryPromises)
+          await Promise.all(categoryPromises)
 
-        // Fetch the updated channel with categories
+          // Update the channel object with categories for the UI
+          newChannel.categories = selectedCategories
+        }
+
+        // Ensure is_favorited property is set
+        if (newChannel.is_favorited === undefined) {
+          newChannel.is_favorited = false
+        }
+
         onAddChannel(newChannel)
         setHandle("")
         setSelectedCategories([])
@@ -92,6 +106,7 @@ export function AddChannelDialog({ isOpen, onClose, onAddChannel }: AddChannelDi
           description: `${newChannel.title} has been added to your channel list${selectedCategories.length > 0 ? ` with ${selectedCategories.length} categories` : ""}.`,
         })
       } catch (error) {
+        console.error("Error adding channel:", error)
         toast({
           title: "Error",
           description: "Failed to add channel. Please check the channel handle and try again.",

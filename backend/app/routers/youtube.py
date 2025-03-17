@@ -5,7 +5,7 @@ from ..schemas.channel import ChannelAddParams, ChannelOut, ChannelSearchParams,
 from ..schemas.video import VideoOut, VideoSearchParams, VideoSearchResponse, VideoUpdate
 from ..dependencies import DBSessionDep, YouTubeAPIDep
 from ..db.crud import crud_channel, crud_video
-from ..services.youtube_service import handle_add_channel, background_handle_add_all_channel_uploads
+from ..services.youtube_service import handle_add_channel, background_handle_add_all_channel_uploads, handle_update_channel_videos
 
 router = APIRouter(
     prefix="/youtube",
@@ -51,6 +51,14 @@ async def update_channel_by_id(db_session: DBSessionDep, channel_id: str, channe
 async def delete_channel_by_id(channel_id: str, db_session: DBSessionDep):
     await crud_channel.delete_channel(db_session, channel_id)
     return { "message": "channel deleted" }
+
+@router.post("/channels/{channel_id}/refresh", response_model=ChannelOut)
+async def refresh_channel_by_id(db_session: DBSessionDep, ytapi: YouTubeAPIDep, channel_id: str):
+    existing_channel = await crud_channel.get_channel_by_id(db_session, channel_id)
+    if not existing_channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    await handle_update_channel_videos(channel_id, db_session, ytapi)
+    return existing_channel
 
 @router.get("/videos/", response_model=VideoSearchResponse)
 async def get_videos(db_session: DBSessionDep, video_search_query: Annotated[VideoSearchParams, Query()]):

@@ -46,16 +46,15 @@ export function CategoryFilter({ onCategoryChange, selectedCategories = [] }: Ca
     setSelectedCategoryIds(new Set(selectedCategories.map((c) => c.id)))
   }, [selectedCategories])
 
-  // Notify parent component when selected categories change
-  useEffect(() => {
-    const selectedCats = categories.filter((cat) => selectedCategoryIds.has(cat.id))
-    onCategoryChange(selectedCats)
-  }, [selectedCategoryIds, categories, onCategoryChange])
-
   const handleCategorySelect = (categoryId: string) => {
     const id = Number.parseInt(categoryId)
     if (!selectedCategoryIds.has(id)) {
-      setSelectedCategoryIds(new Set([...selectedCategoryIds, id]))
+      const newSelectedIds = new Set([...selectedCategoryIds, id])
+      setSelectedCategoryIds(newSelectedIds)
+
+      // Update the parent component with the selected category objects
+      const selectedCats = categories.filter((cat) => newSelectedIds.has(cat.id))
+      onCategoryChange(selectedCats)
     }
   }
 
@@ -63,6 +62,10 @@ export function CategoryFilter({ onCategoryChange, selectedCategories = [] }: Ca
     const newSelectedIds = new Set(selectedCategoryIds)
     newSelectedIds.delete(categoryId)
     setSelectedCategoryIds(newSelectedIds)
+
+    // Update the parent component with the selected category objects
+    const selectedCats = categories.filter((cat) => newSelectedIds.has(cat.id))
+    onCategoryChange(selectedCats)
   }
 
   // Filter out categories that are already selected

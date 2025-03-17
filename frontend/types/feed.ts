@@ -15,4 +15,5 @@ export interface Feed {
   created_at: string; // ISO format datetime
   last_updated: string; // ISO format datetime
   total_articles: number;
+  is_favorited: boolean;
 }

@@ -13,8 +13,8 @@ class FeedCategory(Base):
 class ChannelCategory(Base):
     __tablename__ = "channel_categories"
 
-    channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id"), primary_key=True)
-    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"), primary_key=True)
+    channel_id: Mapped[str] = mapped_column(ForeignKey("channels.id", ondelete="CASCADE"), primary_key=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"), primary_key=True)
 
 
 class Category(Base):

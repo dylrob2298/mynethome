@@ -20,7 +20,9 @@ class FeedAdd(BaseModel):
 
 class FeedUpdate(BaseModel):
     name: str | None = None
+    url: HttpUrl | None = None
     category: str | None = None
+    is_favorited: bool | None = None
 
 class FeedCreate(FeedBase):
     pass
@@ -31,6 +33,7 @@ class FeedOut(FeedBase):
     last_updated: datetime
     total_articles: int = 0
     categories: list[CategoryOut] = []
+    is_favorited: bool
 
     model_config = {
         "from_attributes": True

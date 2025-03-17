@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { X, Tag } from "lucide-react"
+import { X, Tag, Plus } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { CategoryManagementDialog } from "./category-management-dialog"
 
 interface FeedCategoryManagerProps {
   feed: Feed
@@ -32,6 +33,7 @@ export function FeedCategoryManager({ feed, onUpdate, open, onOpenChange }: Feed
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false)
 
   // Handle controlled or uncontrolled open state
   const isOpen = open !== undefined ? open : isDialogOpen
@@ -141,79 +143,91 @@ export function FeedCategoryManager({ feed, onUpdate, open, onOpenChange }: Feed
   const availableCategories = allCategories.filter((category) => !feedCategories.some((c) => c.id === category.id))
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Tag className="h-4 w-4 mr-2" />
-          Manage Categories
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Manage Feed Categories</DialogTitle>
-          <DialogDescription>Add or remove categories for {feed.name}</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Tag className="h-4 w-4 mr-2" />
+            Manage Categories
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Feed Categories</DialogTitle>
+            <DialogDescription>Add or remove categories for {feed.name}</DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Current Categories</h4>
-            <div className="flex flex-wrap gap-2">
-              {feedCategories.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No categories assigned</p>
-              ) : (
-                feedCategories.map((category) => (
-                  <Badge key={category.id} variant="secondary" className="flex items-center gap-1">
-                    {category.name}
-                    <button
-                      onClick={() => handleRemoveCategory(category.id)}
-                      className="ml-1 rounded-full hover:bg-muted p-0.5"
-                      disabled={isLoading}
-                    >
-                      <X className="h-3 w-3" />
-                      <span className="sr-only">Remove {category.name}</span>
-                    </button>
-                  </Badge>
-                ))
-              )}
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Current Categories</h4>
+              <div className="flex flex-wrap gap-2">
+                {feedCategories.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No categories assigned</p>
+                ) : (
+                  feedCategories.map((category) => (
+                    <Badge key={category.id} variant="secondary" className="flex items-center gap-1">
+                      {category.name}
+                      <button
+                        onClick={() => handleRemoveCategory(category.id)}
+                        className="ml-1 rounded-full hover:bg-muted p-0.5"
+                        disabled={isLoading}
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Remove {category.name}</span>
+                      </button>
+                    </Badge>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <Select
-              value={selectedCategoryId}
-              onValueChange={setSelectedCategoryId}
-              disabled={availableCategories.length === 0 || isLoading}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableCategories.map((category) => (
-                  <SelectItem key={category.id} value={category.id.toString()}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleAddCategory} disabled={!selectedCategoryId || isLoading}>
-              Add
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedCategoryId}
+                onValueChange={setSelectedCategoryId}
+                disabled={availableCategories.length === 0 || isLoading}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleAddCategory} disabled={!selectedCategoryId || isLoading}>
+                Add
+              </Button>
+            </div>
+
+            <Button variant="outline" className="w-full" onClick={() => setIsCategoryManagementOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Create New Category
             </Button>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setIsOpen(false)
-              onUpdate()
-            }}
-          >
-            Done
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsOpen(false)
+                onUpdate()
+              }}
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CategoryManagementDialog
+        open={isCategoryManagementOpen}
+        onOpenChange={setIsCategoryManagementOpen}
+        onCategoriesUpdated={fetchCategories}
+      />
+    </>
   )
 }
 

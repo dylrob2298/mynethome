@@ -27,7 +27,7 @@ async def get_feed_by_id(db: AsyncSession, id: int) -> Feed | None:
 async def get_all_feeds(db: AsyncSession) -> list[Feed] | None:
     query = select(Feed)
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.unique().scalars().all()
 
 async def update_feed(db: AsyncSession, feed_id: int, feed_update: FeedUpdate) -> Feed:
     db_feed = await get_feed_by_id(db, feed_id)

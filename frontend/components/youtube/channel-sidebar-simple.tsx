@@ -7,7 +7,7 @@ import { useState, useEffect } from "react"
 import type { Channel } from "@/types/youtube"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder, Star, Heart } from "lucide-react"
+import { Plus, Search, Edit, Inbox, ChevronRight, ChevronDown, Folder, Star, Heart, Minus } from "lucide-react"
 import { AddChannelDialog } from "./add-channel-dialog"
 import { EditChannelsWidget } from "./edit-channels-widget"
 import Image from "next/image"
@@ -241,51 +241,59 @@ export function ChannelSidebarSimple({
 
         <Separator className="my-2" />
 
-        {/* Favorite Channels */}
-        {favoriteChannelsList.length > 0 && (
-          <>
-            <div className="text-xs font-medium text-muted-foreground px-3 py-1">Favorite Channels</div>
-            <div className="space-y-1 mt-1">
-              {favoriteChannelsList.map((channel) => (
-                <button
-                  key={channel.id}
-                  onClick={() => onChannelSelect(channel)}
-                  className={`w-full flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
-                    selectedChannel?.id === channel.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-                  }`}
-                >
-                  <div className="flex-shrink-0 mr-2 relative">
-                    <Image
-                      src={channel.thumbnail_url || "/placeholder.svg"}
-                      alt={`${channel.title} icon`}
-                      width={24}
-                      height={24}
-                      className="rounded-full object-cover"
-                    />
-                    {channel.is_favorited && (
-                      <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5">
-                        <Heart className="h-2.5 w-2.5 fill-red-500 text-red-500" />
-                      </div>
-                    )}
-                  </div>
-                  <span className="truncate">{channel.title}</span>
-                  {channel.total_videos > 0 && (
-                    <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
-                      {channel.total_videos}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-            <Separator className="my-2" />
-          </>
-        )}
-
         {/* Loading State */}
         {isLoading ? (
           renderSkeletonItems()
         ) : (
           <>
+            {/* Favorite Channels */}
+            {favoriteChannelsList.length > 0 && (
+              <>
+                <div className="text-xs font-medium text-muted-foreground px-3 py-1">Favorite Channels</div>
+                <div className="space-y-1 mt-1">
+                  {favoriteChannelsList.map((channel) => (
+                    <div key={channel.id} className="flex items-center">
+                      <button
+                        onClick={() => onChannelSelect(channel)}
+                        className={`flex-1 flex items-center px-3 py-2 text-sm rounded-md transition-colors ${
+                          selectedChannel?.id === channel.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
+                        }`}
+                      >
+                        <div className="flex-shrink-0 mr-2 relative">
+                          <Image
+                            src={channel.thumbnail_url || "/placeholder.svg"}
+                            alt={`${channel.title} icon`}
+                            width={24}
+                            height={24}
+                            className="rounded-full object-cover"
+                          />
+                          {channel.is_favorited && (
+                            <div className="absolute -top-1 -right-1 bg-background rounded-full p-0.5">
+                              <Heart className="h-2.5 w-2.5 fill-red-500 text-red-500" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="truncate">{channel.title}</span>
+                        {channel.total_videos > 0 && (
+                          <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded-full">
+                            {channel.total_videos}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={(e) => handleToggleFavorite(channel, e)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:bg-accent/50 hover:opacity-100 opacity-0 transition-opacity"
+                        title="Remove from favorites"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <Separator className="my-2" />
+              </>
+            )}
+
             {/* Categories */}
             {Object.entries(groupedChannels).map(([category, categoryChannels]) => (
               <Collapsible key={category} open={expandedCategories.has(category)}>

@@ -18,6 +18,7 @@ class Feed(Base):
     last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc), nullable=False)
     modified: Mapped[str | None] = mapped_column(nullable=True)
     etag: Mapped[str | None] = mapped_column(nullable=True)
+    is_favorited: Mapped[bool] = mapped_column(default=False)
 
     articles: Mapped[list["Article"]] = relationship( # type: ignore
         "Article", secondary="feed_articles", back_populates="feeds", lazy="selectin"

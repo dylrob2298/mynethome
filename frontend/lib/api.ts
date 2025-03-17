@@ -52,6 +52,11 @@ export async function editFeed(feedId: number, updates: Partial<Feed>): Promise<
   return ensureFeedCategories(updatedFeed)
 }
 
+// Add this function to toggle feed favorites
+export async function toggleFeedFavorite(feedId: number, isFavorited: boolean): Promise<Feed> {
+  return editFeed(feedId, { is_favorited: isFavorited })
+}
+
 export async function deleteFeed(feedId: number): Promise<void> {
   await fetchWithErrorHandling(`${API_BASE_URL}/feeds/${feedId}`, {
     method: "DELETE",
